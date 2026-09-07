@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
@@ -42,13 +41,11 @@ export async function signInAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!email) redirect("/login?error=missing_email");
 
-  const headerStore = await headers();
-  const origin = headerStore.get("origin") ?? siteUrl();
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${origin}/auth/callback`
+      emailRedirectTo: `${siteUrl()}/auth/callback`
     }
   });
 
