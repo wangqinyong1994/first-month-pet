@@ -5,17 +5,30 @@ import Image from "next/image";
 import Link from "next/link";
 import { ProfileForm } from "../profile-form";
 import { milestoneImagePath } from "@/lib/milestones";
+import { petVisualImage } from "@/lib/visuals";
 
 export default async function ProfilePage() {
   const data = await getProfileData();
 
   return (
     <main className="page">
-      <h1 className="page-title">Profile</h1>
-      <p className="lede">
-        These details help organize this pet&apos;s first-month plan. For a copy of your application
-        data or an account-deletion request, see <Link className="source-link" href="/contact">Contact</Link>.
-      </p>
+      <section className="profile-hero">
+        <div>
+          <h1 className="page-title">Profile</h1>
+          <p className="lede">
+            These details help organize this pet&apos;s first-month plan. For a copy of your application
+            data or an account-deletion request, see <Link className="source-link" href="/contact">Contact</Link>.
+          </p>
+        </div>
+        <Image
+          className="section-image"
+          src={petVisualImage(data.profile.pet_type)}
+          alt={`Illustrative scene of a ${data.profile.pet_type} resting in a calm home`}
+          width={1000}
+          height={700}
+          sizes="(max-width: 760px) 100vw, 36vw"
+        />
+      </section>
 
       <section className="grid">
         <ProfileForm>

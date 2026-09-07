@@ -3,6 +3,7 @@ import Image from "next/image";
 import { concernLabel } from "@/lib/domain";
 import { getHomeData } from "@/lib/app-data";
 import { milestoneImagePath } from "@/lib/milestones";
+import { petVisualImage } from "@/lib/visuals";
 import { submitCheckInAction } from "../actions";
 import { PendingButton } from "../pending-button";
 import { TaskActionForm } from "../task-action-form";
@@ -13,14 +14,24 @@ export default async function HomePage() {
 
   return (
     <main className="page">
-      <section className="hero">
-        <span className="pill">{data.afterFirstMonth ? "First-month period ended" : `Day ${data.currentDay}`}</span>
-        <h1>{data.afterFirstMonth ? `${data.profile.name}'s first-month period has ended` : `${data.profile.name}'s plan for today`}</h1>
-        <p>
-          {data.afterFirstMonth
-            ? "Keep routine care and veterinary follow-up in view over the next three months."
-            : "Start with today’s care step, then review the concern that needs the most attention."}
-        </p>
+      <section className="hero home-hero">
+        <div>
+          <span className="pill">{data.afterFirstMonth ? "First-month period ended" : `Day ${data.currentDay}`}</span>
+          <h1>{data.afterFirstMonth ? `${data.profile.name}'s first-month period has ended` : `${data.profile.name}'s plan for today`}</h1>
+          <p>
+            {data.afterFirstMonth
+              ? "Keep routine care and veterinary follow-up in view over the next three months."
+              : "Start with today’s care step, then review the concern that needs the most attention."}
+          </p>
+        </div>
+        <Image
+          className="section-image"
+          src={petVisualImage(data.profile.pet_type)}
+          alt={`Illustrative scene of a ${data.profile.pet_type} resting in a calm home`}
+          width={1000}
+          height={700}
+          sizes="(max-width: 760px) 100vw, 36vw"
+        />
       </section>
 
       <section className="home-grid">

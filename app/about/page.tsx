@@ -1,3 +1,6 @@
+import Image from "next/image";
+import { visualImage } from "@/lib/visuals";
+
 export default function AboutPage() {
   return (
     <main className="page">
@@ -5,6 +8,14 @@ export default function AboutPage() {
         <h1>About First Month Pet</h1>
         <p>First Month Pet helps new cat and dog parents organize the first month at home.</p>
       </section>
+      <Image
+        className="section-image support-image"
+        src={visualImage.support}
+        alt="A quiet home workspace with a pet blanket and everyday care items"
+        width={1100}
+        height={700}
+        sizes="(max-width: 760px) 100vw, 58vw"
+      />
       <section className="panel stack">
         <div>
           <h2>A practical first-month plan</h2>

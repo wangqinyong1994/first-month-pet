@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { getUserOrRedirect, paidAccess, recordProductEvent, requireProfile } from "@/lib/app-data";
+import { visualImage } from "@/lib/visuals";
 import { createCheckoutSessionAction } from "../actions";
 import { PendingButton } from "../pending-button";
 
@@ -10,8 +12,8 @@ export default async function PaywallPage() {
   await recordProductEvent({ userId: user.id, petProfileId: profile.id, eventName: "paywall_viewed" });
 
   return (
-    <main className="page">
-      <section className="hero">
+    <main className="page paywall-page">
+      <section className="hero paywall-hero">
         <h1>Unlock {profile.name}&apos;s full 30-day plan</h1>
         <p>Unlock your full 30-day care plan and feel more prepared through the first month.</p>
       </section>
@@ -48,6 +50,14 @@ export default async function PaywallPage() {
           </p>
         </aside>
       </section>
+      <Image
+        className="section-image paywall-image"
+        src={visualImage.paywall}
+        alt="A calm home with everyday pet care items arranged along a routine"
+        width={1100}
+        height={760}
+        sizes="(max-width: 760px) 100vw, 42vw"
+      />
     </main>
   );
 }

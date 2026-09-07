@@ -1,3 +1,6 @@
+import Image from "next/image";
+import { visualImage } from "@/lib/visuals";
+
 export default function ContactPage() {
   return (
     <main className="page">
@@ -6,6 +9,14 @@ export default function ContactPage() {
         <p>Support and refund requests: <a className="source-link" href="mailto:wqy1994yeah@gmail.com">wqy1994yeah@gmail.com</a></p>
         <p>Location: Hong Kong, China</p>
       </section>
+      <Image
+        className="section-image support-image"
+        src={visualImage.support}
+        alt="A quiet home workspace with a pet blanket and everyday care items"
+        width={1100}
+        height={700}
+        sizes="(max-width: 760px) 100vw, 58vw"
+      />
       <section className="stack">
         <section className="panel">
           <h2>Data requests</h2>

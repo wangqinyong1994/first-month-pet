@@ -1,6 +1,8 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { checkoutStatus } from "@/lib/app-data";
+import { visualImage } from "@/lib/visuals";
 
 export default async function CheckoutReturnPage({
   searchParams
@@ -33,6 +35,14 @@ export default async function CheckoutReturnPage({
             Back home
           </Link>
         </div>
+        <Image
+          className="section-image checkout-image"
+          src={visualImage.checkout}
+          alt="A calm home entryway with a pet blanket, water bowl, and notebook"
+          width={1000}
+          height={620}
+          sizes="(max-width: 760px) 100vw, 58vw"
+        />
       </section>
     </main>
   );

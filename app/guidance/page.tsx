@@ -1,4 +1,6 @@
 import Link from "next/link";
+import Image from "next/image";
+import { visualImage } from "@/lib/visuals";
 
 export default function GuidancePage() {
   return (
@@ -25,6 +27,14 @@ export default function GuidancePage() {
           <p>Concern guidance is fixed, species-aware educational content written for the first month at home. We update it only after checking the wording and next-step boundaries again.</p>
           <Link className="secondary" href="/contact">Contact support</Link>
         </section>
+        <Image
+          className="section-image support-image"
+          src={visualImage.safety}
+          alt="A calm pet resting in a quiet room"
+          width={1100}
+          height={700}
+          sizes="(max-width: 760px) 100vw, 58vw"
+        />
       </section>
     </main>
   );

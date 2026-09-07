@@ -10,6 +10,7 @@ import {
   sortConcernKeys,
   taskUiState,
   taskProgress,
+  publicLandingPreview,
   visibleConcernGuidance,
   visiblePlanNode
 } from "./domain";
@@ -95,6 +96,49 @@ export async function staticContent() {
       priority_reason: item.priority_reason
     })) as ConcernGuidance[],
     milestoneDefinitions: (milestones.data ?? []) as MilestoneDefinition[]
+  };
+}
+
+export async function getPublicLandingData() {
+  const admin = createSupabaseAdminClient();
+  const { data: freeNode, error: freeNodeError } = await admin
+    .from("care_plan_nodes")
+    .select("*")
+    .eq("free_preview", true)
+    .order("sort_order")
+    .maybeSingle();
+
+  if (freeNodeError) throw freeNodeError;
+  if (!freeNode) throw new Error("Free Day 1 preview is unavailable");
+
+  const [lockedNodes, tasks] = await Promise.all([
+    admin
+      .from("care_plan_nodes")
+      .select("id, title, day_start, day_end")
+      .eq("free_preview", false)
+      .order("sort_order"),
+    admin
+      .from("task_definitions")
+      .select("title, description")
+      .eq("node_id", freeNode.id)
+      .eq("trigger_type", "always")
+      .eq("is_paid_feature", false)
+      .order("due_day")
+  ]);
+
+  if (lockedNodes.error) throw lockedNodes.error;
+  if (tasks.error) throw tasks.error;
+
+  const preview = publicLandingPreview(
+    freeNode as CarePlanNode,
+    (lockedNodes.data ?? []) as Array<Pick<CarePlanNode, "id" | "title" | "day_start" | "day_end">>
+  );
+
+  return {
+    ...preview,
+    tasks: (tasks.data ?? []).map(({ title, description }) => ({ title, description })) as Array<
+      Pick<TaskDefinition, "title" | "description">
+    >
   };
 }
 
@@ -266,6 +310,17 @@ export async function getConcernDetail(concernKey: string) {
   const user = await getUserOrRedirect();
   const profile = await requireProfile(user.id);
   const [{ guidance }, state] = await Promise.all([staticContent(), userState(user.id, profile)]);
+  const admin = createSupabaseAdminClient();
+  const { data: latestAction, error: latestActionError } = await admin
+    .from("concern_actions")
+    .select("action")
+    .eq("user_id", user.id)
+    .eq("pet_profile_id", profile.id)
+    .eq("concern_key", concernKey)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latestActionError) throw latestActionError;
   const detail = selectConcernGuidance(guidance, concernKey, profile.pet_type);
   if (!detail) return null;
 
@@ -280,6 +335,7 @@ export async function getConcernDetail(concernKey: string) {
     profile,
     concernKey,
     paid: state.paid,
+    selectedAction: (latestAction?.action as ConcernAction | null) ?? null,
     detail: visibleConcernGuidance(detail, state.paid)
   };
 }

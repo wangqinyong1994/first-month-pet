@@ -1,5 +1,7 @@
 import Link from "next/link";
+import Image from "next/image";
 import { getPlanData } from "@/lib/app-data";
+import { visualImage } from "@/lib/visuals";
 import { TaskActionForm } from "../task-action-form";
 
 type PlanPageProps = {
@@ -13,8 +15,20 @@ export default async function PlanPage({ searchParams }: PlanPageProps) {
 
   return (
     <main className="page">
-      <h1 className="page-title">30-day plan</h1>
-      <p className="lede">{data.paid ? `Your full timeline is available for ${data.profile.name}.` : "Day 1 is included in the free preview. Paid access unlocks the full timeline."}</p>
+      <section className="plan-hero">
+        <div>
+          <h1 className="page-title">30-day plan</h1>
+          <p className="lede">{data.paid ? `Your full timeline is available for ${data.profile.name}.` : "Day 1 is included in the free preview. Paid access unlocks the full timeline."}</p>
+        </div>
+        <Image
+          className="section-image"
+          src={visualImage.routine}
+          alt="A calm home routine with pet supplies arranged for the day"
+          width={1000}
+          height={700}
+          sizes="(max-width: 760px) 100vw, 36vw"
+        />
+      </section>
       <PlanSummary data={data} actionNode={actionNode} />
 
       <div className="plan-list">

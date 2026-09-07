@@ -9,7 +9,7 @@ Provide an evidence-led assessment of whether First Month Pet has a commercially
 - The MVP targets English-speaking first-time cat or dog adopters in Europe and North America during the first 30 days after adoption.
 - The product offers a free Day 1 preview and safety guidance; a $9.99 one-time, one-profile purchase unlocks the full 30-day plan, personalised tasks, milestones, and source context.
 - The repository contains Supabase Auth/Postgres integration, server-side entitlement checks, Creem checkout creation, signed webhook-based fulfilment/refunds, and private funnel-event capture.
-- A Netlify production URL is reachable, but this assessment must not treat reachability as proof that production Supabase, Creem, magic-link delivery, or migration state are correctly configured.
+- This assessment is based on the current local working tree, including uncommitted application, migration, and product-document changes. The remote deployment is intentionally excluded from functional and UX conclusions.
 
 ## Requirements
 

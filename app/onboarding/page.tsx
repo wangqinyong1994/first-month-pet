@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { CONCERNS } from "@/lib/domain";
 import { getProfile, getUserOrRedirect, recordProductEvent } from "@/lib/app-data";
 import { createProfileAction } from "../actions";
 import { PendingButton } from "../pending-button";
+import { visualImage } from "@/lib/visuals";
 
 export default async function OnboardingPage() {
   const user = await getUserOrRedirect();
@@ -11,11 +13,13 @@ export default async function OnboardingPage() {
   await recordProductEvent({ userId: user.id, eventName: "onboarding_viewed" });
 
   return (
-    <main className="page">
-      <h1 className="page-title">Create your pet profile</h1>
-      <p className="lede">One profile is supported in this MVP.</p>
+    <main className="page onboarding-page">
+      <section className="onboarding-hero">
+        <h1 className="page-title">Create your pet profile</h1>
+        <p className="lede">One profile is supported in this MVP.</p>
+      </section>
 
-      <form className="card" action={createProfileAction}>
+      <form className="card onboarding-form" action={createProfileAction}>
         <label className="label" htmlFor="pet_type">
           Pet type
         </label>
@@ -90,6 +94,15 @@ export default async function OnboardingPage() {
 
         <PendingButton className="button" type="submit" pendingLabel="Creating profile…">Create profile</PendingButton>
       </form>
+      <Image
+        className="section-image onboarding-image"
+        src={visualImage.onboarding}
+        alt="A new pet parent preparing a calm home for a newly adopted cat"
+        width={1100}
+        height={760}
+        priority
+        sizes="(max-width: 760px) 100vw, 42vw"
+      />
     </main>
   );
 }

@@ -127,6 +127,23 @@ export function visiblePlanNode(node: CarePlanNode, paid: boolean) {
   };
 }
 
+export function publicLandingPreview(
+  freeNode: CarePlanNode,
+  lockedNodes: Array<Pick<CarePlanNode, "id" | "title" | "day_start" | "day_end">>
+) {
+  const visibleFreeNode = visiblePlanNode(freeNode, false);
+  return {
+    dayOne: {
+      id: visibleFreeNode.id,
+      title: visibleFreeNode.title,
+      common_signs: visibleFreeNode.common_signs,
+      what_to_do: visibleFreeNode.what_to_do,
+      when_to_seek_help: visibleFreeNode.when_to_seek_help
+    },
+    lockedNodes: lockedNodes.map(({ id, title, day_start, day_end }) => ({ id, title, day_start, day_end }))
+  };
+}
+
 export function visibleConcernGuidance(guidance: ConcernGuidance, paid: boolean) {
   if (paid) return guidance;
   return { ...guidance, priority_reason: "" };

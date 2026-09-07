@@ -13,6 +13,7 @@ import {
   taskMutationValues,
   taskProgress,
   taskUiState,
+  publicLandingPreview,
   visibleConcernGuidance,
   visiblePlanNode
 } from "../lib/domain";
@@ -41,6 +42,18 @@ test("free users only receive locked node metadata for paid nodes", () => {
   assert.equal(visible.common_signs, "");
   assert.equal(visible.what_to_do, "");
   assert.equal(visible.when_to_seek_help, "paid help");
+});
+
+test("public landing keeps paid timeline copy out of its projection", () => {
+  const preview = publicLandingPreview(
+    { ...paidNode, id: "day_1", title: "Day 1", free_preview: true, common_signs: "Free signs", what_to_do: "Free actions" },
+    [paidNode]
+  );
+
+  assert.deepEqual(preview.lockedNodes, [{ id: "day_2", title: "Day 2", day_start: 2, day_end: 2 }]);
+  assert.equal(preview.dayOne.common_signs, "Free signs");
+  assert.equal("what_to_do" in preview.lockedNodes[0], false);
+  assert.equal("when_to_seek_help" in preview.lockedNodes[0], false);
 });
 
 test("free concern guidance keeps the vet and urgent-care thresholds without provenance", () => {

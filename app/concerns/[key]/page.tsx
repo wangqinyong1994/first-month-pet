@@ -1,9 +1,18 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { concernLabel } from "@/lib/domain";
 import { getConcernDetail } from "@/lib/app-data";
 import { concernActionFormAction } from "@/app/actions";
 import { PendingButton } from "@/app/pending-button";
+import { visualImage } from "@/lib/visuals";
+import type { ConcernAction } from "@/lib/types";
+
+const concernActionLabels: Record<ConcernAction, string> = {
+  observe: "Observe closely",
+  ask_a_vet: "Consider contacting a vet",
+  seek_urgent_care: "Seek urgent care"
+};
 
 export default async function ConcernDetailPage({
   params
@@ -13,6 +22,7 @@ export default async function ConcernDetailPage({
   const { key } = await params;
   const data = await getConcernDetail(key);
   if (!data) notFound();
+  const selectedActionLabel = data.selectedAction ? concernActionLabels[data.selectedAction] : null;
 
   return (
     <main className="page">
@@ -25,14 +35,15 @@ export default async function ConcernDetailPage({
 
       <section className="concern-layout">
         <aside className="panel concern-actions">
-          <h2>Next step</h2>
+          <h2>{selectedActionLabel ? "Change next step" : "Next step"}</h2>
           <p className="muted small">Choosing an action saves it in your plan. It does not contact a veterinarian, schedule care, or message support.</p>
+          {selectedActionLabel ? <p className="notice" role="status">Saved: {selectedActionLabel}. Choose another option only if your situation changes.</p> : null}
           <form className="stack" action={concernActionFormAction}>
             <input name="pet_profile_id" type="hidden" value={data.profile.id} />
             <input name="concern_key" type="hidden" value={key} />
-            <PendingButton className="secondary action-observe" name="action" type="submit" value="observe" pendingLabel="Saving…">Observe closely</PendingButton>
-            <PendingButton className="secondary action-vet" name="action" type="submit" value="ask_a_vet" pendingLabel="Saving…">Consider contacting a vet</PendingButton>
-            <PendingButton className="button action-urgent" name="action" type="submit" value="seek_urgent_care" pendingLabel="Saving…">Seek urgent care</PendingButton>
+            <PendingButton aria-pressed={data.selectedAction === "observe"} className="secondary action-observe" disabled={data.selectedAction === "observe"} name="action" type="submit" value="observe" pendingLabel="Saving…">{data.selectedAction === "observe" ? "Saved — Observe closely" : "Observe closely"}</PendingButton>
+            <PendingButton aria-pressed={data.selectedAction === "ask_a_vet"} className="secondary action-vet" disabled={data.selectedAction === "ask_a_vet"} name="action" type="submit" value="ask_a_vet" pendingLabel="Saving…">{data.selectedAction === "ask_a_vet" ? "Saved — Consider contacting a vet" : "Consider contacting a vet"}</PendingButton>
+            <PendingButton aria-pressed={data.selectedAction === "seek_urgent_care"} className="button action-urgent" disabled={data.selectedAction === "seek_urgent_care"} name="action" type="submit" value="seek_urgent_care" pendingLabel="Saving…">{data.selectedAction === "seek_urgent_care" ? "Saved — Seek urgent care" : "Seek urgent care"}</PendingButton>
           </form>
         </aside>
         <div className="stack">
@@ -62,6 +73,14 @@ export default async function ConcernDetailPage({
               </Link>
             </section>
           )}
+          <Image
+            className="section-image safety-image"
+            src={visualImage.safety}
+            alt="A pet resting in a quiet home while someone observes from nearby"
+            width={1100}
+            height={700}
+            sizes="(max-width: 760px) 100vw, 58vw"
+          />
         </div>
 
       </section>
