@@ -1,6 +1,11 @@
 import type {
   CarePlanNode,
+  CheckInStatus,
+  ConcernAction,
   ConcernGuidance,
+  ArrivalGroupSize,
+  AdoptionSource,
+  AgeStage,
   HealthRecordsStatus,
   PetProfile,
   PetTask,
@@ -8,6 +13,13 @@ import type {
   PurchaseStatus,
   TaskDefinition
 } from "./types";
+
+export const ARRIVAL_GROUP_SIZES: readonly ArrivalGroupSize[] = ["one", "two", "three_plus"];
+export const AGE_STAGES: readonly AgeStage[] = ["kitten_puppy", "adult", "senior", "unknown"];
+export const ADOPTION_SOURCES: readonly AdoptionSource[] = ["shelter", "breeder", "friend", "stray", "other"];
+export const HEALTH_RECORD_STATUSES: readonly HealthRecordsStatus[] = ["yes", "no", "not_sure"];
+export const CHECK_IN_STATUSES: readonly CheckInStatus[] = ["better", "same", "worse"];
+export const CONCERN_ACTIONS = ["observe", "ask_a_vet", "seek_urgent_care"] as const;
 
 export const CONCERNS = [
   ["not_eating_or_drinking", "Not eating or drinking"],
@@ -51,9 +63,42 @@ export function taskUiState(task: Pick<PetTask, "status" | "done_at" | "due_date
   return task.due_date < current ? "overdue" : "upcoming";
 }
 
+export function planNodeTimeState(
+  node: Pick<CarePlanNode, "day_start" | "day_end">,
+  currentDay: number
+): "today" | "upcoming" | "ended" {
+  if (node.day_end < currentDay) return "ended";
+  if (node.day_start <= currentDay) return "today";
+  return "upcoming";
+}
+
+export function taskProgress(tasks: Array<Pick<PetTask, "status" | "done_at" | "due_date">>, today = new Date()) {
+  const completed = tasks.filter((task) => taskUiState(task, today) === "done").length;
+  const overdue = tasks.filter((task) => taskUiState(task, today) === "overdue").length;
+  return { total: tasks.length, completed, outstanding: tasks.length - completed, overdue };
+}
+
+export function defaultPlanNodeId(
+  nodes: Array<{ id: string; timeState: ReturnType<typeof planNodeTimeState>; taskProgress: ReturnType<typeof taskProgress> }>
+) {
+  if (nodes.every((node) => node.taskProgress.outstanding === 0)) return null;
+  return (
+    nodes.find((node) => node.taskProgress.overdue > 0)?.id ??
+    nodes.find((node) => node.timeState === "today")?.id ??
+    nodes.find((node) => node.taskProgress.outstanding > 0)?.id ??
+    null
+  );
+}
+
+export function taskMutationValues(operation: "done" | "undo", now = new Date()) {
+  return operation === "done"
+    ? { status: "done" as const, done_at: now.toISOString() }
+    : { status: "not_done" as const, done_at: null };
+}
+
 export function shouldCreateTask(
   task: Pick<TaskDefinition, "trigger_type" | "is_paid_feature">,
-  profile: Pick<PetProfile, "pet_type" | "health_records_status">,
+  profile: Pick<PetProfile, "pet_type" | "health_records_status" | "arrival_group_size" | "has_resident_pets">,
   concernKeys: string[],
   paid = true
 ) {
@@ -62,6 +107,8 @@ export function shouldCreateTask(
   if (task.trigger_type === "always") return true;
   if (task.trigger_type === `pet_type_${profile.pet_type}`) return true;
   if (task.trigger_type === `health_records_${profile.health_records_status}`) return true;
+  if (task.trigger_type === "arrival_group_multiple") return profile.arrival_group_size !== "one";
+  if (task.trigger_type === "resident_pets_yes") return profile.has_resident_pets;
   if (task.trigger_type.startsWith("concern_")) {
     return concernKeys.includes(task.trigger_type.replace("concern_", ""));
   }
@@ -76,9 +123,25 @@ export function visiblePlanNode(node: CarePlanNode, paid: boolean) {
     ...node,
     common_signs: "",
     what_to_do: "",
-    when_to_seek_help: "",
     locked: true
   };
+}
+
+export function visibleConcernGuidance(guidance: ConcernGuidance, paid: boolean) {
+  if (paid) return guidance;
+  return { ...guidance, priority_reason: "" };
+}
+
+export function isCheckInStatus(value: string): value is CheckInStatus {
+  return CHECK_IN_STATUSES.includes(value as CheckInStatus);
+}
+
+export function isConcernAction(value: string): value is ConcernAction {
+  return CONCERN_ACTIONS.includes(value as ConcernAction);
+}
+
+export function isAfterFirstMonth(day: number) {
+  return day > 30;
 }
 
 export function selectConcernGuidance(

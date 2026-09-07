@@ -11,6 +11,8 @@ Core value:
 - Reduce anxiety during the first month after adoption.
 - Help users avoid missing key care steps.
 
+Safety boundary: every user can read Common settling-in, Ask a vet, and Seek urgent care guidance for a selected concern. Paid access adds the 30-day plan, personalized task context, source notes, and full Milestones progression; it never withholds an urgent-care threshold.
+
 This product is not a medical diagnosis tool and must not position itself as a replacement for a veterinarian.
 
 ## Target User
@@ -70,6 +72,8 @@ Required fields:
 - Estimated age: kitten or puppy / adult / senior / unknown.
 - Health records status: yes / no / not sure.
 - Adoption source: shelter / breeder / friend / stray / other.
+- New arrivals at the same time: one / two / three or more.
+- Whether another pet already lives at home.
 - Current concerns: multi-select.
 
 Current concern options:
@@ -151,6 +155,8 @@ When a user completes a task, record:
 - task_id.
 - done_at.
 
+When profile conditions or concerns change, reconcile materialized tasks: eligible tasks are active with recalculated due dates; ineligible tasks become inactive without deleting completion history.
+
 Do not record notes, photos, or attachments in MVP.
 
 Reminders are in-app only. No email, SMS, or browser push reminders in MVP.
@@ -202,14 +208,14 @@ Locked milestones show soft hints instead of hard conditions. Example:
 - "Plan your first vet check when you're ready."
 - "Continue through your 30-day care plan."
 
-Milestones do not unlock paid features or discounts in MVP. First Month Complete may later connect to long-term health reminders.
+Milestones do not unlock paid features or discounts in MVP. After Day 30, show a compact handoff for routine care and veterinary follow-up over the next three months; do not implement a long-term plan in this MVP.
 
 ## Monetization
 
 Free preview includes:
 
 - Day 1 content.
-- Basic guidance for today's selected concerns.
+- Selected-concern safety guidance, including Ask a vet and Seek urgent care.
 - Day 1 milestone.
 - Future node titles and dates visible, with body content locked.
 
@@ -218,7 +224,7 @@ Paid unlock includes:
 - Full 30-day onboarding timeline.
 - Personalized care steps based on pet type, age stage, source, health record status, and selected concerns.
 - In-app upcoming / overdue reminders.
-- Full concern detail pages with sources.
+- Concern rationale and source notes.
 - Full Milestones progression.
 
 Pricing:
@@ -270,6 +276,7 @@ Track:
 - Day 7 return rate.
 - Task completion rate.
 - Refund rate.
+- Daily check-in submission and worse-status follow-up rate.
 
 ## MVP Success Standard
 

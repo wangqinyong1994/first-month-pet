@@ -66,6 +66,8 @@ Columns:
 - estimated_age_stage text not null.
 - health_records_status text not null.
 - adoption_source text not null.
+- arrival_group_size text not null default `one`.
+- has_resident_pets boolean not null default false.
 - created_at timestamptz not null default now().
 - updated_at timestamptz not null default now().
 
@@ -75,6 +77,7 @@ Suggested constraints:
 - estimated_age_stage in `kitten_puppy`, `adult`, `senior`, `unknown`.
 - health_records_status in `yes`, `no`, `not_sure`.
 - adoption_source in `shelter`, `breeder`, `friend`, `stray`, `other`.
+- arrival_group_size in `one`, `two`, `three_plus`.
 
 MVP invariant:
 
@@ -187,7 +190,33 @@ Columns:
 - due_date date not null.
 - status text not null default 'not_done'.
 - done_at timestamptz.
+- is_active boolean not null default true.
 - created_at timestamptz not null default now().
+
+Task reconciliation:
+
+- Profile creation and profile update materialize all eligible task definitions.
+- Upsert preserves `status` and `done_at` for existing rows.
+- No-longer-eligible rows become `is_active = false`, so Home, Plan, and Milestone derivation exclude them without deleting history.
+
+### pet_check_ins
+
+Purpose: one low-friction daily status per pet profile.
+
+- user_id and pet_profile_id owned by the authenticated user.
+- check_in_date date not null.
+- status in `better`, `same`, `worse`.
+- Unique `(pet_profile_id, check_in_date)`; same-day submit is an upsert.
+
+No free text is stored.
+
+### product_events
+
+Purpose: private server-side funnel events; an insert failure must not block product behavior.
+
+Event names: onboarding_viewed, profile_created, home_viewed, concern_opened, task_completed, check_in_submitted, paywall_viewed, checkout_started, purchase_completed, refund_created.
+
+RLS is enabled with no client policy. Server-side service-role code writes the rows.
 
 Suggested constraints:
 

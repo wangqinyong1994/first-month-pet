@@ -1,6 +1,10 @@
 import { CONCERNS, HEALTH_RECORD_STATUS_LABEL, concernLabel } from "@/lib/domain";
 import { getProfileData } from "@/lib/app-data";
-import { updateProfileAction } from "../actions";
+import { TextField } from "@radix-ui/themes";
+import Image from "next/image";
+import Link from "next/link";
+import { ProfileForm } from "../profile-form";
+import { milestoneImagePath } from "@/lib/milestones";
 
 export default async function ProfilePage() {
   const data = await getProfileData();
@@ -9,81 +13,108 @@ export default async function ProfilePage() {
     <main className="page">
       <h1 className="page-title">Profile</h1>
       <p className="lede">
-        Pet profile, account state, purchase state, and Milestones for this first-month plan.
+        These details help organize this pet&apos;s first-month plan. For a copy of your application
+        data or an account-deletion request, see <Link className="source-link" href="/contact">Contact</Link>.
       </p>
 
       <section className="grid">
-        <form className="panel" action={updateProfileAction}>
+        <ProfileForm>
           <input name="profile_id" type="hidden" value={data.profile.id} />
-          <h2>{data.profile.name}</h2>
-          <p className="muted">
-            {data.profile.pet_type} · adopted {data.profile.adoption_date} ·{" "}
-            {HEALTH_RECORD_STATUS_LABEL[data.profile.health_records_status]}
-          </p>
+          <section className="form-section">
+            <h2>Pet details</h2>
+            <p className="muted">
+              {data.profile.pet_type} · adopted {data.profile.adoption_date} ·{" "}
+              {HEALTH_RECORD_STATUS_LABEL[data.profile.health_records_status]}
+            </p>
 
-          <label className="label" htmlFor="name">
-            Name
-          </label>
-          <input className="input" id="name" name="name" defaultValue={data.profile.name} required />
+            <label className="label" htmlFor="name">
+              Name
+            </label>
+            <TextField.Root id="name" name="name" defaultValue={data.profile.name} required />
 
-          <label className="label" htmlFor="adoption_date">
+            <label className="label" htmlFor="adoption_date">
             Adoption date
-          </label>
-          <input
+            </label>
+            <input
             className="input"
             id="adoption_date"
             name="adoption_date"
             type="date"
             defaultValue={data.profile.adoption_date}
             required
-          />
+            />
 
-          <label className="label" htmlFor="estimated_age_stage">
+            <label className="label" htmlFor="estimated_age_stage">
             Estimated age
-          </label>
-          <select
+            </label>
+            <select
             className="select"
             id="estimated_age_stage"
             name="estimated_age_stage"
             defaultValue={data.profile.estimated_age_stage}
-          >
+            >
             <option value="kitten_puppy">Kitten or puppy</option>
             <option value="adult">Adult</option>
             <option value="senior">Senior</option>
             <option value="unknown">Unknown</option>
-          </select>
+            </select>
 
-          <label className="label" htmlFor="health_records_status">
+            <label className="label" htmlFor="arrival_group_size">
+            New arrivals at the same time
+            </label>
+            <select
+            className="select"
+            id="arrival_group_size"
+            name="arrival_group_size"
+            defaultValue={data.profile.arrival_group_size}
+            >
+            <option value="one">One</option>
+            <option value="two">Two</option>
+            <option value="three_plus">Three or more</option>
+            </select>
+
+            <label className="check">
+            <input
+              defaultChecked={data.profile.has_resident_pets}
+              name="has_resident_pets"
+              type="checkbox"
+              value="yes"
+            />
+            There is already another pet at home
+            </label>
+
+            <label className="label" htmlFor="health_records_status">
             Health records status
-          </label>
-          <select
+            </label>
+            <select
             className="select"
             id="health_records_status"
             name="health_records_status"
             defaultValue={data.profile.health_records_status}
-          >
+            >
             <option value="yes">Yes</option>
             <option value="no">No</option>
             <option value="not_sure">Not sure</option>
-          </select>
+            </select>
 
-          <label className="label" htmlFor="adoption_source">
+            <label className="label" htmlFor="adoption_source">
             Adoption source
-          </label>
-          <select
+            </label>
+            <select
             className="select"
             id="adoption_source"
             name="adoption_source"
             defaultValue={data.profile.adoption_source}
-          >
+            >
             <option value="shelter">Shelter</option>
             <option value="breeder">Breeder</option>
             <option value="friend">Friend</option>
             <option value="stray">Stray</option>
             <option value="other">Other</option>
-          </select>
+            </select>
+          </section>
 
-          <fieldset className="checks">
+          <fieldset className="checks form-section">
             <legend className="label">Current concerns</legend>
             {CONCERNS.map(([value, label]) => (
               <label className="check" key={value}>
@@ -98,17 +129,14 @@ export default async function ProfilePage() {
             ))}
           </fieldset>
 
-          <button className="button" type="submit">
-            Save profile
-          </button>
-        </form>
+        </ProfileForm>
 
         <aside className="stack">
           <section className="panel">
             <h2>Account</h2>
             <p className="muted">{data.user.email}</p>
             <p>
-              Purchase state: <strong>{data.paid ? "paid" : data.purchases[0]?.status ?? "free"}</strong>
+              Plan access: <strong>{data.paid ? "unlocked" : data.purchases[0]?.status ?? "free preview"}</strong>
             </p>
           </section>
 
@@ -132,13 +160,22 @@ export default async function ProfilePage() {
         <div className="stack">
           {data.milestones.map(({ definition, unlocked }) => (
             <div className="milestone-row" key={definition.id}>
-              <div>
-                <strong>{definition.title}</strong>
-                <p className="muted">
-                  {unlocked
-                    ? `${definition.value_copy} Unlocked ${new Date(unlocked.unlocked_at).toLocaleDateString()}.`
-                    : definition.locked_hint}
-                </p>
+              <div className="milestone-summary">
+                <Image
+                  className={unlocked ? "milestone-image" : "milestone-image milestone-image-locked"}
+                  src={milestoneImagePath(definition.id)}
+                  alt=""
+                  width={72}
+                  height={72}
+                />
+                <div>
+                  <strong>{definition.title}</strong>
+                  <p className="muted">
+                    {unlocked
+                      ? `${definition.value_copy} Unlocked ${new Date(unlocked.unlocked_at).toLocaleDateString()}.`
+                      : definition.locked_hint}
+                  </p>
+                </div>
               </div>
               <span className="pill">{unlocked ? "unlocked" : "locked"}</span>
             </div>

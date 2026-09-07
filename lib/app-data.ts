@@ -2,10 +2,15 @@ import { redirect } from "next/navigation";
 import {
   dateForDay,
   dayNumber,
+  defaultPlanNodeId,
+  isAfterFirstMonth,
   nodeForDay,
+  planNodeTimeState,
   selectConcernGuidance,
   sortConcernKeys,
   taskUiState,
+  taskProgress,
+  visibleConcernGuidance,
   visiblePlanNode
 } from "./domain";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "./supabase/server";
@@ -15,8 +20,10 @@ import type {
   ConcernGuidance,
   MilestoneDefinition,
   PetMilestone,
+  PetCheckIn,
   PetProfile,
   PetTask,
+  ProductEventName,
   PurchaseStatus,
   TaskDefinition
 } from "./types";
@@ -77,14 +84,24 @@ export async function staticContent() {
   return {
     nodes: (nodes.data ?? []) as CarePlanNode[],
     taskDefinitions: (tasks.data ?? []) as TaskDefinition[],
-    guidance: (guidance.data ?? []) as ConcernGuidance[],
+    guidance: (guidance.data ?? []).map((item) => ({
+      id: item.id,
+      concern_key: item.concern_key,
+      pet_type: item.pet_type,
+      priority_rank: item.priority_rank,
+      common_settling_in: item.common_settling_in,
+      ask_a_vet: item.ask_a_vet,
+      seek_urgent_care: item.seek_urgent_care,
+      priority_reason: item.priority_reason
+    })) as ConcernGuidance[],
     milestoneDefinitions: (milestones.data ?? []) as MilestoneDefinition[]
   };
 }
 
 export async function userState(userId: string, profile: PetProfile) {
   const supabase = createSupabaseAdminClient();
-  const [concerns, tasks, milestones, purchases] = await Promise.all([
+  const today = new Date().toISOString().slice(0, 10);
+  const [concerns, tasks, milestones, purchases, checkIn] = await Promise.all([
     supabase
       .from("pet_concerns")
       .select("concern_key")
@@ -96,6 +113,7 @@ export async function userState(userId: string, profile: PetProfile) {
       .select("*, task_definitions(*)")
       .eq("user_id", userId)
       .eq("pet_profile_id", profile.id)
+      .eq("is_active", true)
       .order("due_date"),
     supabase
       .from("pet_milestones")
@@ -108,10 +126,17 @@ export async function userState(userId: string, profile: PetProfile) {
       .select("status, creem_checkout_id")
       .eq("user_id", userId)
       .eq("pet_profile_id", profile.id)
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("pet_check_ins")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("pet_profile_id", profile.id)
+      .eq("check_in_date", today)
+      .maybeSingle()
   ]);
 
-  for (const result of [concerns, tasks, milestones, purchases]) {
+  for (const result of [concerns, tasks, milestones, purchases, checkIn]) {
     if (result.error) throw result.error;
   }
 
@@ -125,6 +150,7 @@ export async function userState(userId: string, profile: PetProfile) {
     tasks: (tasks.data ?? []) as PetTask[],
     milestones: (milestones.data ?? []) as PetMilestone[],
     purchases: purchaseRows,
+    todayCheckIn: checkIn.data as PetCheckIn | null,
     paid: purchaseRows.some((row) => row.status === "paid")
   };
 }
@@ -138,7 +164,8 @@ export async function getHomeData() {
   ]);
 
   const currentDay = dayNumber(profile.adoption_date);
-  const currentNode = nodeForDay(nodes, currentDay);
+  const afterFirstMonth = isAfterFirstMonth(currentDay);
+  const currentNode = afterFirstMonth ? null : nodeForDay(nodes, currentDay);
   const visibleNode = currentNode ? visiblePlanNode(currentNode, state.paid) : null;
   const sortedConcerns = sortConcernKeys(state.concernKeys, guidance, profile.pet_type).map((key) => ({
     key,
@@ -148,19 +175,28 @@ export async function getHomeData() {
   const nextTask =
     visibleTasks.find((task) => taskUiState(task) === "overdue") ??
     visibleTasks.find((task) => taskUiState(task) === "upcoming") ??
-    visibleTasks.find((task) => taskUiState(task) === "done") ??
     null;
   const recentMilestone = state.milestones[0] ?? null;
+
+  await recordProductEvent({
+    userId: user.id,
+    petProfileId: profile.id,
+    eventName: "home_viewed",
+    metadata: { current_day: currentDay, paid: state.paid }
+  });
 
   return {
     user,
     profile,
     paid: state.paid,
     currentDay,
+    afterFirstMonth,
     currentNode: visibleNode,
     currentNodeDate: currentNode ? nodeDateLabel(profile.adoption_date, currentNode) : "",
     concerns: sortedConcerns,
+    todayCheckIn: state.todayCheckIn,
     nextTask,
+    hasOutstandingTasks: visibleTasks.some((task) => taskUiState(task) !== "done"),
     nextTaskState: nextTask ? taskUiState(nextTask) : null,
     recentMilestone,
     recentMilestoneDefinition: recentMilestone
@@ -178,16 +214,29 @@ export async function getPlanData() {
     ? state.tasks
     : state.tasks.filter((task) => !task.task_definitions?.is_paid_feature);
 
+  const planNodes = nodes.map((node) => {
+    const nodeTasks = visibleTasks
+      .filter((task) => task.task_definitions?.node_id === node.id)
+      .sort((left, right) => Number(taskUiState(left) === "done") - Number(taskUiState(right) === "done"));
+    return {
+      ...visiblePlanNode(node, state.paid),
+      dateLabel: nodeDateLabel(profile.adoption_date, node),
+      timeState: planNodeTimeState(node, currentDay),
+      taskProgress: taskProgress(nodeTasks),
+      tasks: nodeTasks
+    };
+  });
+  const progress = taskProgress(visibleTasks);
+
   return {
     profile,
     paid: state.paid,
-    tasks: visibleTasks,
-    nodes: nodes.map((node) => ({
-      ...visiblePlanNode(node, state.paid),
-      dateLabel: nodeDateLabel(profile.adoption_date, node),
-      status: node.day_end < currentDay ? "completed" : node.day_start <= currentDay ? "current" : "upcoming",
-      tasks: visibleTasks.filter((task) => task.task_definitions?.node_id === node.id)
-    }))
+    currentDay,
+    afterFirstMonth: isAfterFirstMonth(currentDay),
+    currentStage: planNodes.find((node) => node.timeState === "today")?.title ?? null,
+    progress,
+    defaultOpenNodeId: defaultPlanNodeId(planNodes),
+    nodes: planNodes
   };
 }
 
@@ -220,19 +269,39 @@ export async function getConcernDetail(concernKey: string) {
   const detail = selectConcernGuidance(guidance, concernKey, profile.pet_type);
   if (!detail) return null;
 
+  await recordProductEvent({
+    userId: user.id,
+    petProfileId: profile.id,
+    eventName: "concern_opened",
+    metadata: { concern_key: concernKey, paid: state.paid }
+  });
+
   return {
     profile,
     concernKey,
     paid: state.paid,
-    detail: state.paid
-      ? detail
-      : {
-          ...detail,
-          ask_a_vet: "",
-          seek_urgent_care: "",
-          source_notes: null
-        }
+    detail: visibleConcernGuidance(detail, state.paid)
   };
+}
+
+export async function recordProductEvent(input: {
+  userId: string;
+  petProfileId?: string;
+  eventName: ProductEventName;
+  metadata?: Record<string, string | number | boolean>;
+}) {
+  try {
+    const admin = createSupabaseAdminClient();
+    const { error } = await admin.from("product_events").insert({
+      user_id: input.userId,
+      pet_profile_id: input.petProfileId ?? null,
+      event_name: input.eventName,
+      metadata: input.metadata ?? {}
+    });
+    if (error) throw error;
+  } catch {
+    // Product-event collection must not block the visitor's primary action.
+  }
 }
 
 export async function checkoutStatus(checkoutId: string) {
@@ -257,7 +326,7 @@ export async function unlockMilestone(input: {
   triggerConcernActionId?: string;
 }) {
   const admin = createSupabaseAdminClient();
-  const { error } = await admin.from("pet_milestones").upsert(
+  const { data, error } = await admin.from("pet_milestones").upsert(
     {
       user_id: input.userId,
       pet_profile_id: input.petProfileId,
@@ -266,9 +335,10 @@ export async function unlockMilestone(input: {
       trigger_concern_action_id: input.triggerConcernActionId ?? null
     },
     { onConflict: "pet_profile_id,milestone_id", ignoreDuplicates: true }
-  );
+  ).select("milestone_id");
 
   if (error) throw error;
+  return (data ?? []).length > 0;
 }
 
 export async function recordConcernAction(input: {
@@ -278,6 +348,15 @@ export async function recordConcernAction(input: {
   action: ConcernAction;
 }) {
   const supabase = await createSupabaseServerClient();
+  const { data: profile, error: profileError } = await supabase
+    .from("pet_profiles")
+    .select("id")
+    .eq("id", input.petProfileId)
+    .eq("user_id", input.userId)
+    .maybeSingle();
+  if (profileError) throw profileError;
+  if (!profile) throw new Error("Pet profile not found");
+
   const { data, error } = await supabase
     .from("concern_actions")
     .insert({
@@ -290,7 +369,7 @@ export async function recordConcernAction(input: {
     .single();
 
   if (error) throw error;
-  await unlockMilestone({
+  return unlockMilestone({
     userId: input.userId,
     petProfileId: input.petProfileId,
     milestoneId: "concern_handled_thoughtfully",

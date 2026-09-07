@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { concernLabel } from "@/lib/domain";
 import { getConcernDetail } from "@/lib/app-data";
 import { concernActionFormAction } from "@/app/actions";
+import { PendingButton } from "@/app/pending-button";
 
 export default async function ConcernDetailPage({
   params
@@ -18,35 +19,44 @@ export default async function ConcernDetailPage({
       <h1 className="page-title">{concernLabel(key)}</h1>
       <p className="lede">
         Selected concerns are sorted by broad risk level. This page is educational and is not
-        medical advice.
+        medical advice. If you think your pet may be having an emergency, contact a veterinarian
+        or emergency veterinary service now.
       </p>
 
-      <section className="grid">
+      <section className="concern-layout">
+        <aside className="panel concern-actions">
+          <h2>Next step</h2>
+          <p className="muted small">Choosing an action saves it in your plan. It does not contact a veterinarian, schedule care, or message support.</p>
+          <form className="stack" action={concernActionFormAction}>
+            <input name="pet_profile_id" type="hidden" value={data.profile.id} />
+            <input name="concern_key" type="hidden" value={key} />
+            <PendingButton className="secondary action-observe" name="action" type="submit" value="observe" pendingLabel="Saving…">Observe closely</PendingButton>
+            <PendingButton className="secondary action-vet" name="action" type="submit" value="ask_a_vet" pendingLabel="Saving…">Consider contacting a vet</PendingButton>
+            <PendingButton className="button action-urgent" name="action" type="submit" value="seek_urgent_care" pendingLabel="Saving…">Seek urgent care</PendingButton>
+          </form>
+        </aside>
         <div className="stack">
           <section className="panel">
             <span className="pill">Common settling-in</span>
             <p>{data.detail.common_settling_in}</p>
           </section>
 
+          <section className="panel">
+            <span className="pill">Ask a vet</span>
+            <p>{data.detail.ask_a_vet}</p>
+          </section>
+          <section className="panel">
+            <span className="pill">Seek urgent care</span>
+            <p>{data.detail.seek_urgent_care}</p>
+          </section>
           {data.paid ? (
-            <>
-              <section className="panel">
-                <span className="pill">Ask a vet</span>
-                <p>{data.detail.ask_a_vet}</p>
-              </section>
-              <section className="panel">
-                <span className="pill">Seek urgent care</span>
-                <p>{data.detail.seek_urgent_care}</p>
-              </section>
-              <section className="panel">
-                <h2>Why this appears here</h2>
-                <p>{data.detail.priority_reason}</p>
-                {data.detail.source_notes ? <p className="muted small">{data.detail.source_notes}</p> : null}
-              </section>
-            </>
+            <section className="panel">
+              <h2>Why this appears here</h2>
+              <p>{data.detail.priority_reason}</p>
+            </section>
           ) : (
             <section className="panel locked">
-              <p>Unlock your full 30-day care plan and feel more prepared through the first month.</p>
+              <p>Keep these safety steps available. Unlock the full first-month timeline and care context.</p>
               <Link className="button" href="/paywall">
                 Unlock my 30-day plan - $9.99
               </Link>
@@ -54,22 +64,6 @@ export default async function ConcernDetailPage({
           )}
         </div>
 
-        <aside className="panel">
-          <h2>Next step</h2>
-          <form className="stack" action={concernActionFormAction}>
-            <input name="pet_profile_id" type="hidden" value={data.profile.id} />
-            <input name="concern_key" type="hidden" value={key} />
-            <button className="secondary" name="action" type="submit" value="observe">
-              Observe closely
-            </button>
-            <button className="secondary" name="action" type="submit" value="ask_a_vet">
-              Consider contacting a vet
-            </button>
-            <button className="secondary" name="action" type="submit" value="seek_urgent_care">
-              Seek urgent care
-            </button>
-          </form>
-        </aside>
       </section>
     </main>
   );

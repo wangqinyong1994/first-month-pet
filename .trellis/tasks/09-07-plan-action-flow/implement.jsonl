@@ -1,0 +1,5 @@
+{"file":".trellis/spec/frontend/components.md","reason":"Server and client component boundaries, semantic navigation, forms, and accessibility"}
+{"file":".trellis/spec/frontend/state-management.md","reason":"Durable selected-node context belongs in the URL"}
+{"file":".trellis/spec/frontend/css-layout.md","reason":"Responsive spacing, touch targets, and overflow checks"}
+{"file":".trellis/spec/shared/code-quality.md","reason":"Type safety, focused error handling, and minimal scoped changes"}
+{"file":"spec-data-supabase-creem.md","reason":"Existing pet task status, done_at, access, and ownership contracts"}

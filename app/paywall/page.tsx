@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
-import { getUserOrRedirect, paidAccess, requireProfile } from "@/lib/app-data";
+import { getUserOrRedirect, paidAccess, recordProductEvent, requireProfile } from "@/lib/app-data";
 import { createCheckoutSessionAction } from "../actions";
+import { PendingButton } from "../pending-button";
 
 export default async function PaywallPage() {
   const user = await getUserOrRedirect();
   const profile = await requireProfile(user.id);
   if (await paidAccess(user.id, profile.id)) redirect("/home");
+  await recordProductEvent({ userId: user.id, petProfileId: profile.id, eventName: "paywall_viewed" });
 
   return (
     <main className="page">
@@ -14,31 +16,35 @@ export default async function PaywallPage() {
         <p>Unlock your full 30-day care plan and feel more prepared through the first month.</p>
       </section>
 
-      <section className="grid">
-        <div className="panel">
-          <h2>Included</h2>
-          <ul>
-            <li>Full 30-day onboarding timeline.</li>
-            <li>Personalized care steps for this pet profile.</li>
-            <li>In-app upcoming and overdue reminders.</li>
-            <li>Full concern detail pages with source notes.</li>
-            <li>Full Milestones progression.</li>
-            <li>One-time $9.99 purchase for one pet profile.</li>
-            <li>7-day refund policy.</li>
-          </ul>
+      <section className="paywall-grid">
+        <div className="panel paywall-main">
+          <h2>What changes</h2>
+          <div className="value-grid">
+            <section>
+              <h3>Know the next step</h3>
+              <p>Open the full 30-day timeline instead of guessing what comes next.</p>
+            </section>
+            <section>
+              <h3>Use your pet&apos;s context</h3>
+              <p>See care steps matched to the profile, concerns, and records you added.</p>
+            </section>
+            <section>
+              <h3>Keep progress in view</h3>
+              <p>Use in-app reminders, concern context, and full Milestones.</p>
+            </section>
+          </div>
           <form action={createCheckoutSessionAction}>
-            <button className="button" type="submit">
-              Unlock my 30-day plan - $9.99
-            </button>
+            <PendingButton className="button" type="submit" pendingLabel="Starting checkout…">Unlock my 30-day plan - $9.99</PendingButton>
           </form>
+          <p className="muted small">One-time $9.99 purchase for one pet profile. Request a full refund within seven calendar days at wqy1994yeah@gmail.com; refunds return to the original payment method, are processed by Creem, and are not prorated.</p>
         </div>
 
         <aside className="panel">
           <h2>Free preview</h2>
-          <p>Day 1 content, basic selected-concern guidance, and future timeline titles stay available.</p>
+          <p>Day 1 content, selected-concern safety guidance, and future timeline titles stay available.</p>
           <p className="muted small">
-            Payment is processed by Creem. Browser redirects do not unlock the plan by
-            themselves.
+            Payment is processed by Creem. Free safety guidance remains available whether or not
+            you unlock the full plan. <a className="source-link" href="/refund">Read the refund policy</a>.
           </p>
         </aside>
       </section>

@@ -49,6 +49,8 @@ Required fields:
 - Estimated age: kitten or puppy / adult / senior / unknown.
 - Health records status: yes / no / not sure.
 - Adoption source: shelter / breeder / friend / stray / other.
+- New arrivals at the same time: one / two / three or more.
+- Whether another pet already lives at home.
 - Current concerns: multi-select.
 
 Current concern options:
@@ -84,7 +86,10 @@ Home content order:
 2. Current Day X onboarding card.
 3. Today's most important action.
 4. Recent Milestone feedback.
-5. Compact link to Plan.
+5. Daily Better / About the same / Worse check-in.
+6. Compact link to Plan.
+
+When the user selects Worse, keep the check-in and link to the highest-priority concern, or Profile if none is selected.
 
 ### Concern Priority Area
 
@@ -113,7 +118,8 @@ If no concern exists:
 Free user behavior:
 
 - Show basic guidance for today's selected concerns.
-- Lock full concern detail pages.
+- Show Common settling-in, Ask a vet, and Seek urgent care on every concern detail page.
+- Lock only paid context: priority rationale and source notes.
 
 Paid user behavior:
 
@@ -241,6 +247,7 @@ Editable pet fields:
 - Current concerns.
 
 Editing adoption date should be allowed within a reasonable MVP rule, but it must not create a new charge. If changed, recalculate Day X and task dates.
+Editing conditions or concerns also reconciles generated tasks without deleting prior completion history.
 
 ### Milestones List
 
@@ -305,7 +312,7 @@ Offer details:
 - Includes full 30-day onboarding timeline.
 - Includes personalized care steps.
 - Includes in-app upcoming / overdue reminders.
-- Includes full concern detail pages with sources.
+- Includes concern context and source notes.
 - Includes full Milestones progression.
 - 7-day refund.
 
@@ -368,10 +375,10 @@ Free path:
 
 30-day completion path:
 
-1. User reaches Day 30.
-2. First Month Complete Milestone unlocks.
-3. App offers a future long-term reminder mode entry point.
-4. MVP does not implement the full long-term mode.
+1. User reaches Day 31.
+2. App shows a compact handoff for routine care and veterinary follow-up over the next three months.
+3. Active concerns and outstanding tasks remain visible.
+4. MVP does not implement a long-term plan or reminders.
 
 ## Acceptance Criteria
 

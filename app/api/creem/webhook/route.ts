@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { recordProductEvent } from "@/lib/app-data";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { verifyCreemWebhookSignature } from "@/lib/creem";
 
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
         throw new Error("Checkout metadata is incomplete");
       }
 
-      const { error } = await admin
+      const { data: purchase, error } = await admin
         .from("purchases")
         .update({
           status: "paid",
@@ -58,19 +59,37 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", purchaseId)
         .eq("user_id", userId)
-        .eq("pet_profile_id", petProfileId);
+        .eq("pet_profile_id", petProfileId)
+        .select("user_id, pet_profile_id")
+        .maybeSingle();
       if (error) throw error;
+      if (purchase) {
+        await recordProductEvent({
+          userId: purchase.user_id,
+          petProfileId: purchase.pet_profile_id,
+          eventName: "purchase_completed"
+        });
+      }
     }
 
     if (event.eventType === "refund.created") {
       const order = event.object.transaction?.order;
       const orderId = typeof order === "string" ? order : order?.id;
       if (orderId) {
-        const { error } = await admin
+        const { data: purchase, error } = await admin
           .from("purchases")
           .update({ status: "refunded", refunded_at: new Date().toISOString() })
-          .eq("creem_order_id", orderId);
+          .eq("creem_order_id", orderId)
+          .select("user_id, pet_profile_id")
+          .maybeSingle();
         if (error) throw error;
+        if (purchase) {
+          await recordProductEvent({
+            userId: purchase.user_id,
+            petProfileId: purchase.pet_profile_id,
+            eventName: "refund_created"
+          });
+        }
       }
     }
 

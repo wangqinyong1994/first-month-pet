@@ -19,8 +19,8 @@ export default async function CheckoutReturnPage({
         <h1>Checkout {status === "pending" ? "processing" : status}</h1>
         {status === "pending" ? (
           <p>
-            Creem has returned you to the app, but the local purchase record is not fulfilled yet.
-            Refresh this page after the webhook is processed.
+            We&apos;re confirming your payment with Creem. Please refresh this page in a moment. If
+            access does not update, email wqy1994yeah@gmail.com.
           </p>
         ) : (
           <p>Free preview remains active for this pet profile.</p>

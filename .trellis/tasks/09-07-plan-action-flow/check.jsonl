@@ -1,0 +1,4 @@
+{"file":".trellis/spec/frontend/components.md","reason":"Check semantic details, navigation, form controls, and accessible feedback"}
+{"file":".trellis/spec/frontend/css-layout.md","reason":"Check desktop and mobile layout, touch sizing, and overflow"}
+{"file":".trellis/spec/shared/code-quality.md","reason":"Check type safety, errors, dead code, and focused diff"}
+{"file":"spec-data-supabase-creem.md","reason":"Check task update and current-user data invariants"}

@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
 import { CONCERNS } from "@/lib/domain";
-import { getProfile, getUserOrRedirect } from "@/lib/app-data";
+import { getProfile, getUserOrRedirect, recordProductEvent } from "@/lib/app-data";
 import { createProfileAction } from "../actions";
+import { PendingButton } from "../pending-button";
 
 export default async function OnboardingPage() {
   const user = await getUserOrRedirect();
   const profile = await getProfile(user.id);
   if (profile) redirect("/home");
+  await recordProductEvent({ userId: user.id, eventName: "onboarding_viewed" });
 
   return (
     <main className="page">
@@ -62,6 +64,20 @@ export default async function OnboardingPage() {
           <option value="other">Other</option>
         </select>
 
+        <label className="label" htmlFor="arrival_group_size">
+          New arrivals at the same time
+        </label>
+        <select className="select" id="arrival_group_size" name="arrival_group_size" required>
+          <option value="one">One</option>
+          <option value="two">Two</option>
+          <option value="three_plus">Three or more</option>
+        </select>
+
+        <label className="check">
+          <input name="has_resident_pets" type="checkbox" value="yes" />
+          There is already another pet at home
+        </label>
+
         <fieldset className="checks">
           <legend className="label">Current concerns</legend>
           {CONCERNS.map(([value, label]) => (
@@ -72,9 +88,7 @@ export default async function OnboardingPage() {
           ))}
         </fieldset>
 
-        <button className="button" type="submit">
-          Create profile
-        </button>
+        <PendingButton className="button" type="submit" pendingLabel="Creating profile…">Create profile</PendingButton>
       </form>
     </main>
   );

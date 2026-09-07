@@ -2,8 +2,21 @@ export type PetType = "cat" | "dog";
 export type AgeStage = "kitten_puppy" | "adult" | "senior" | "unknown";
 export type HealthRecordsStatus = "yes" | "no" | "not_sure";
 export type AdoptionSource = "shelter" | "breeder" | "friend" | "stray" | "other";
+export type ArrivalGroupSize = "one" | "two" | "three_plus";
 export type PurchaseStatus = "pending" | "paid" | "refunded" | "failed" | "canceled";
 export type ConcernAction = "observe" | "ask_a_vet" | "seek_urgent_care";
+export type CheckInStatus = "better" | "same" | "worse";
+export type ProductEventName =
+  | "onboarding_viewed"
+  | "profile_created"
+  | "home_viewed"
+  | "concern_opened"
+  | "task_completed"
+  | "check_in_submitted"
+  | "paywall_viewed"
+  | "checkout_started"
+  | "purchase_completed"
+  | "refund_created";
 
 export type PetProfile = {
   id: string;
@@ -14,6 +27,8 @@ export type PetProfile = {
   estimated_age_stage: AgeStage;
   health_records_status: HealthRecordsStatus;
   adoption_source: AdoptionSource;
+  arrival_group_size: ArrivalGroupSize;
+  has_resident_pets: boolean;
 };
 
 export type CarePlanNode = {
@@ -48,6 +63,7 @@ export type PetTask = {
   due_date: string;
   status: "not_done" | "done";
   done_at: string | null;
+  is_active: boolean;
   task_definitions?: TaskDefinition | null;
 };
 
@@ -60,7 +76,6 @@ export type ConcernGuidance = {
   ask_a_vet: string;
   seek_urgent_care: string;
   priority_reason: string;
-  source_notes: string | null;
 };
 
 export type MilestoneDefinition = {
@@ -81,4 +96,14 @@ export type PetMilestone = {
   unlocked_at: string;
   trigger_task_id: string | null;
   trigger_concern_action_id: string | null;
+};
+
+export type PetCheckIn = {
+  id: string;
+  user_id: string;
+  pet_profile_id: string;
+  check_in_date: string;
+  status: CheckInStatus;
+  created_at: string;
+  updated_at: string;
 };
