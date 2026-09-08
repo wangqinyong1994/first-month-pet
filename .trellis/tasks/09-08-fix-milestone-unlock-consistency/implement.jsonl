@@ -1,0 +1,3 @@
+{"file":"spec-data-supabase-creem.md","reason":"Authoritative milestone unlock rules, idempotency, and paid/free constraints."}
+{"file":"spec-user-flows.md","reason":"User-visible milestone behavior and profile display requirements."}
+{"file":".trellis/spec/guides/pre-implementation-checklist.md","reason":"Repository-required pre-change verification checklist."}

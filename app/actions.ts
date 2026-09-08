@@ -19,6 +19,7 @@ import {
   paidAccess,
   recordProductEvent,
   recordConcernAction,
+  reconcileMilestones,
   staticContent,
   unlockMilestone
 } from "@/lib/app-data";
@@ -221,16 +222,7 @@ async function updateTaskAction(operation: "done" | "undo", formData: FormData):
 
     const unlockedMilestones: string[] = [];
     if (operation === "done") {
-      if (definition?.milestone_key) {
-        const unlocked = await unlockMilestone({
-          userId: user.id,
-          petProfileId: task.pet_profile_id as string,
-          milestoneId: definition.milestone_key,
-          triggerTaskId: taskId
-        });
-        if (unlocked) unlockedMilestones.push(definition.milestone_key);
-      }
-      unlockedMilestones.push(...(await unlockDerivedMilestones(user.id, task.pet_profile_id as string, taskId, definition)));
+      unlockedMilestones.push(...(await reconcileMilestones(user.id, task.pet_profile_id as string)));
       await recordProductEvent({
         userId: user.id,
         petProfileId: task.pet_profile_id as string,
@@ -437,52 +429,4 @@ function isPastOrToday(date: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const parsed = new Date(`${date}T00:00:00Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date && date <= new Date().toISOString().slice(0, 10);
-}
-
-async function unlockDerivedMilestones(
-  userId: string,
-  petProfileId: string,
-  triggerTaskId: string,
-  definition: TaskDefinition | null
-): Promise<string[]> {
-  const admin = createSupabaseAdminClient();
-  const unlockedMilestones: string[] = [];
-
-  if (definition?.node_id === "week_2" || definition?.node_id === "week_3") {
-    if (await unlockMilestone({
-      userId,
-      petProfileId,
-      milestoneId: "routine_taking_shape",
-      triggerTaskId
-    })) unlockedMilestones.push("routine_taking_shape");
-  }
-
-  if ((definition?.due_day ?? 0) >= 30 || definition?.node_id === "week_4") {
-    if (await unlockMilestone({
-      userId,
-      petProfileId,
-      milestoneId: "first_month_complete",
-      triggerTaskId
-    })) unlockedMilestones.push("first_month_complete");
-  }
-
-  const { data: firstWeekDone, error } = await admin
-    .from("pet_tasks")
-    .select("id, task_definitions!inner(due_day)")
-    .eq("pet_profile_id", petProfileId)
-    .eq("is_active", true)
-    .eq("status", "done")
-    .lte("task_definitions.due_day", 7);
-
-  if (error) throw error;
-  if ((firstWeekDone ?? []).length >= 3) {
-    if (await unlockMilestone({
-      userId,
-      petProfileId,
-      milestoneId: "settling_in_week_complete",
-      triggerTaskId
-    })) unlockedMilestones.push("settling_in_week_complete");
-  }
-
-  return unlockedMilestones;
 }

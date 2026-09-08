@@ -14,6 +14,7 @@ import {
   visibleConcernGuidance,
   visiblePlanNode
 } from "./domain";
+import { completedMilestoneTriggers } from "./milestones";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "./supabase/server";
 import type {
   CarePlanNode,
@@ -184,6 +185,23 @@ export async function userState(userId: string, profile: PetProfile) {
     if (result.error) throw result.error;
   }
 
+  let milestoneRows = (milestones.data ?? []) as PetMilestone[];
+  const newlyUnlockedMilestones = await reconcileMilestones(
+    userId,
+    profile.id,
+    (tasks.data ?? []) as PetTask[]
+  );
+  if (newlyUnlockedMilestones.length) {
+    const refreshedMilestones = await supabase
+      .from("pet_milestones")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("pet_profile_id", profile.id)
+      .order("unlocked_at", { ascending: false });
+    if (refreshedMilestones.error) throw refreshedMilestones.error;
+    milestoneRows = (refreshedMilestones.data ?? []) as PetMilestone[];
+  }
+
   const purchaseRows = (purchases.data ?? []) as {
     status: PurchaseStatus;
     creem_checkout_id: string | null;
@@ -192,7 +210,7 @@ export async function userState(userId: string, profile: PetProfile) {
   return {
     concernKeys: (concerns.data ?? []).map((row) => row.concern_key as string),
     tasks: (tasks.data ?? []) as PetTask[],
-    milestones: (milestones.data ?? []) as PetMilestone[],
+    milestones: milestoneRows,
     purchases: purchaseRows,
     todayCheckIn: checkIn.data as PetCheckIn | null,
     paid: purchaseRows.some((row) => row.status === "paid")
@@ -395,6 +413,39 @@ export async function unlockMilestone(input: {
 
   if (error) throw error;
   return (data ?? []).length > 0;
+}
+
+export async function reconcileMilestones(
+  userId: string,
+  petProfileId: string,
+  tasks?: PetTask[]
+) {
+  const admin = createSupabaseAdminClient();
+  let completedTasks = tasks;
+
+  if (!completedTasks) {
+    const { data, error } = await admin
+      .from("pet_tasks")
+      .select("*, task_definitions(*)")
+      .eq("user_id", userId)
+      .eq("pet_profile_id", petProfileId)
+      .eq("is_active", true)
+      .eq("status", "done");
+    if (error) throw error;
+    completedTasks = (data ?? []) as PetTask[];
+  }
+
+  const triggers = completedMilestoneTriggers(completedTasks, userId, petProfileId);
+  const inserted = await Promise.all(
+    triggers.map((trigger) => unlockMilestone({
+      userId,
+      petProfileId,
+      milestoneId: trigger.milestoneId,
+      triggerTaskId: trigger.triggerTaskId
+    }))
+  );
+
+  return triggers.filter((_trigger, index) => inserted[index]).map((trigger) => trigger.milestoneId);
 }
 
 export async function recordConcernAction(input: {

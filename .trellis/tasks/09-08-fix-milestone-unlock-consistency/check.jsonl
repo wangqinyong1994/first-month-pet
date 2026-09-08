@@ -1,0 +1,3 @@
+{"file":"spec-data-supabase-creem.md","reason":"Check implementation against milestone rules and Supabase data invariants."}
+{"file":"spec-user-flows.md","reason":"Check Profile/Home/Plan behavior after reconciliation."}
+{"file":".trellis/spec/guides/pre-implementation-checklist.md","reason":"Run project quality and boundary checks before implementation."}

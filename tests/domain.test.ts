@@ -19,8 +19,8 @@ import {
 } from "../lib/domain";
 import { verifyCreemWebhookSignature } from "../lib/creem";
 import { createHmac } from "node:crypto";
-import { isMilestoneId, milestoneImagePath } from "../lib/milestones";
-import type { CarePlanNode, ConcernGuidance } from "../lib/types";
+import { completedMilestoneTriggers, isMilestoneId, milestoneImagePath } from "../lib/milestones";
+import type { CarePlanNode, ConcernGuidance, PetTask } from "../lib/types";
 
 const paidNode: CarePlanNode = {
   id: "day_2",
@@ -87,6 +87,17 @@ test("multi-pet context only activates its matching task", () => {
   };
   assert.equal(shouldCreateTask({ trigger_type: "arrival_group_multiple", is_paid_feature: false }, profile, []), true);
   assert.equal(shouldCreateTask({ trigger_type: "resident_pets_yes", is_paid_feature: false }, profile, []), false);
+});
+
+test("records review task matches every records status", () => {
+  const base = {
+    pet_type: "cat" as const,
+    arrival_group_size: "one" as const,
+    has_resident_pets: false
+  };
+  assert.equal(shouldCreateTask({ trigger_type: "health_records_yes", is_paid_feature: true }, { ...base, health_records_status: "yes" }, []), true);
+  assert.equal(shouldCreateTask({ trigger_type: "health_records_not_sure", is_paid_feature: true }, { ...base, health_records_status: "not_sure" }, []), true);
+  assert.equal(shouldCreateTask({ trigger_type: "health_records_no", is_paid_feature: true }, { ...base, health_records_status: "no" }, []), true);
 });
 
 test("paid and refunded purchase states do not both grant access", () => {
@@ -181,6 +192,49 @@ test("milestone feedback only accepts known milestone artwork", () => {
   assert.equal(isMilestoneId("first_month_complete"), true);
   assert.equal(isMilestoneId("not-a-milestone"), false);
   assert.equal(milestoneImagePath("first_month_complete"), "/milestones/first-month-complete.png");
+});
+
+test("completed tasks derive direct and timeline milestones", () => {
+  const task = (
+    id: string,
+    definition: Pick<NonNullable<PetTask["task_definitions"]>, "node_id" | "due_day" | "milestone_key">
+  ): PetTask => ({
+    id,
+    user_id: "user",
+    pet_profile_id: "pet",
+    task_definition_id: id,
+    due_date: "2026-09-01",
+    status: "done",
+    done_at: "2026-09-01T00:00:00.000Z",
+    is_active: true,
+    task_definitions: {
+      id,
+      node_id: definition.node_id,
+      title: id,
+      description: null,
+      trigger_type: "always",
+      due_day: definition.due_day,
+      is_paid_feature: true,
+      milestone_key: definition.milestone_key
+    }
+  });
+
+  const triggers = completedMilestoneTriggers([
+    task("vet", { node_id: "day_4", due_day: 4, milestone_key: "vet_visit_planned" }),
+    task("week-2", { node_id: "week_2", due_day: 10, milestone_key: null }),
+    task("week-3", { node_id: "week_3", due_day: 17, milestone_key: null }),
+    task("month", { node_id: "week_4", due_day: 30, milestone_key: null }),
+    task("first-week-1", { node_id: "day_1", due_day: 1, milestone_key: null }),
+    task("first-week-2", { node_id: "day_2", due_day: 2, milestone_key: null }),
+    task("first-week-3", { node_id: "day_3", due_day: 3, milestone_key: null })
+  ]);
+
+  assert.deepEqual(new Set(triggers.map(({ milestoneId }) => milestoneId)), new Set([
+    "vet_visit_planned",
+    "routine_taking_shape",
+    "first_month_complete",
+    "settling_in_week_complete"
+  ]));
 });
 
 function guidanceRow(concern_key: string, priority_rank: number): ConcernGuidance {
