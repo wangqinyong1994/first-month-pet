@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { recordProductEvent } from "@/lib/app-data";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
-import { verifyCreemWebhookSignature } from "@/lib/creem";
+import { shouldProcessCreemEvent, verifyCreemWebhookSignature } from "@/lib/creem";
 
 type CreemEvent = {
   id: string;
@@ -35,7 +35,18 @@ export async function POST(request: NextRequest) {
 
   const admin = createSupabaseAdminClient();
   const { error: insertError } = await admin.from("creem_events").insert({ id: event.id, event_type: event.eventType });
-  if (insertError?.code === "23505") return NextResponse.json({ received: true });
+  if (insertError?.code === "23505") {
+    const { data: existingEvent, error: existingEventError } = await admin
+      .from("creem_events")
+      .select("processed_at")
+      .eq("id", event.id)
+      .maybeSingle();
+    if (existingEventError) throw existingEventError;
+    if (!existingEvent) throw new Error("Creem event record disappeared during duplicate handling");
+    if (!shouldProcessCreemEvent(existingEvent.processed_at)) {
+      return NextResponse.json({ received: true });
+    }
+  }
   if (insertError) throw insertError;
 
   try {

@@ -170,6 +170,7 @@ export default async function ProfilePage() {
 
       <section className="panel">
         <h2>Milestones</h2>
+        {data.showMilestoneUnlockPrompt ? <p className="notice">Unlock the full plan to see every milestone. <Link href="/paywall">View unlock options</Link>.</p> : null}
         <div className="stack">
           {data.milestones.map(({ definition, unlocked }) => (
             <div className="milestone-row" key={definition.id}>

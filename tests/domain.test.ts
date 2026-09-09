@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  canSaveConcernAction,
+  dateForDay,
+  dayNumber,
   hasPaidAccess,
   defaultPlanNodeId,
   isAfterFirstMonth,
@@ -14,13 +17,15 @@ import {
   taskProgress,
   taskUiState,
   publicLandingPreview,
+  safeCallbackPath,
   visibleConcernGuidance,
+  visibleMilestoneDefinitions,
   visiblePlanNode
 } from "../lib/domain";
-import { verifyCreemWebhookSignature } from "../lib/creem";
+import { shouldProcessCreemEvent, verifyCreemWebhookSignature } from "../lib/creem";
 import { createHmac } from "node:crypto";
 import { completedMilestoneTriggers, isMilestoneId, milestoneImagePath } from "../lib/milestones";
-import type { CarePlanNode, ConcernGuidance, PetTask } from "../lib/types";
+import type { CarePlanNode, ConcernGuidance, MilestoneDefinition, PetTask } from "../lib/types";
 
 const paidNode: CarePlanNode = {
   id: "day_2",
@@ -76,6 +81,40 @@ test("check-in statuses and first-month cutoff are constrained", () => {
   assert.equal(isCheckInStatus("urgent"), false);
   assert.equal(isAfterFirstMonth(30), false);
   assert.equal(isAfterFirstMonth(31), true);
+});
+
+test("date-only plan arithmetic is independent of the server timezone", () => {
+  assert.equal(dayNumber("1994-05-15", new Date("1994-05-15T23:30:00+08:00")), 1);
+  assert.equal(dateForDay("1994-05-15", 1), "1994-05-15");
+  assert.equal(dateForDay("1994-05-15", 8), "1994-05-22");
+  assert.equal(dateForDay("1994-05-15", 30), "1994-06-13");
+});
+
+test("callback destinations stay on the app origin", () => {
+  assert.equal(safeCallbackPath("/plan?node=day_1"), "/plan?node=day_1");
+  assert.equal(safeCallbackPath("https://example.com/steal"), "/home");
+  assert.equal(safeCallbackPath("//example.com/steal"), "/home");
+  assert.equal(safeCallbackPath("/\\\\example.com"), "/home");
+});
+
+test("only unprocessed duplicate webhook events are retried", () => {
+  assert.equal(shouldProcessCreemEvent(null), true);
+  assert.equal(shouldProcessCreemEvent("2026-09-08T00:00:00.000Z"), false);
+});
+
+test("concern actions are writable only for active first-month concerns", () => {
+  assert.equal(canSaveConcernAction(true, false), true);
+  assert.equal(canSaveConcernAction(false, false), false);
+  assert.equal(canSaveConcernAction(true, true), false);
+});
+
+test("free users only see non-paid milestone definitions", () => {
+  const definitions = [
+    { id: "free", is_paid_visible: false },
+    { id: "paid", is_paid_visible: true }
+  ] as MilestoneDefinition[];
+  assert.deepEqual(visibleMilestoneDefinitions(definitions, false).map(({ id }) => id), ["free"]);
+  assert.deepEqual(visibleMilestoneDefinitions(definitions, true).map(({ id }) => id), ["free", "paid"]);
 });
 
 test("multi-pet context only activates its matching task", () => {
