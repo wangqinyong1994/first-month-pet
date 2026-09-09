@@ -1,0 +1,7 @@
+{"file":"prd-first-month-pet.md","reason":"Verify findings against intended MVP and medical-safety boundary"}
+{"file":"spec-user-flows.md","reason":"Verify route and state behavior against documented user flows"}
+{"file":"spec-data-supabase-creem.md","reason":"Verify trust-boundary, schema, and payment findings"}
+{"file":"README.md","reason":"Verify local and production setup findings against documented operation"}
+{"file":"SUPPORT-RUNBOOK.md","reason":"Verify operational readiness and data-handling findings"}
+{"file":".trellis/tasks/09-09-project-health-audit/prd.md","reason":"Check full acceptance coverage and out-of-scope compliance"}
+{"file":".trellis/tasks/09-09-project-health-audit/design.md","reason":"Check evidence classification and severity discipline"}

@@ -1,0 +1,7 @@
+{"file":"prd-first-month-pet.md","reason":"Core product scope, safety boundaries, and acceptance assumptions"}
+{"file":"spec-user-flows.md","reason":"Authentication, onboarding, plan, concern, and checkout flow contracts"}
+{"file":"spec-data-supabase-creem.md","reason":"Database, authorization, purchase, and webhook contracts"}
+{"file":"README.md","reason":"Documented local setup and local-versus-production Creem configuration"}
+{"file":"SUPPORT-RUNBOOK.md","reason":"Current production support, export, deletion, and recovery operating boundary"}
+{"file":".trellis/tasks/09-09-project-health-audit/prd.md","reason":"Audit scope, constraints, and observable acceptance criteria"}
+{"file":".trellis/tasks/09-09-project-health-audit/design.md","reason":"Evidence classes, audit boundaries, and read-only safety rules"}
