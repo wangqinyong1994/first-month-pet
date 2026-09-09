@@ -62,3 +62,7 @@ export function verifyCreemWebhookSignature(body: string, signature: string) {
   const expectedBuffer = Buffer.from(expected, "utf8");
   return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer);
 }
+
+export function shouldProcessCreemEvent(processedAt: string | null) {
+  return processedAt === null;
+}

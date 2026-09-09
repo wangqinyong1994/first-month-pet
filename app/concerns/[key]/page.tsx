@@ -35,16 +35,26 @@ export default async function ConcernDetailPage({
 
       <section className="concern-layout">
         <aside className="panel concern-actions">
-          <h2>{selectedActionLabel ? "Change next step" : "Next step"}</h2>
-          <p className="muted small">Choosing an action saves it in your plan. It does not contact a veterinarian, schedule care, or message support.</p>
-          {selectedActionLabel ? <p className="notice" role="status">Saved: {selectedActionLabel}. Choose another option only if your situation changes.</p> : null}
-          <form className="stack" action={concernActionFormAction}>
-            <input name="pet_profile_id" type="hidden" value={data.profile.id} />
-            <input name="concern_key" type="hidden" value={key} />
-            <PendingButton aria-pressed={data.selectedAction === "observe"} className="secondary action-observe" disabled={data.selectedAction === "observe"} name="action" type="submit" value="observe" pendingLabel="Saving…">{data.selectedAction === "observe" ? "Saved — Observe closely" : "Observe closely"}</PendingButton>
-            <PendingButton aria-pressed={data.selectedAction === "ask_a_vet"} className="secondary action-vet" disabled={data.selectedAction === "ask_a_vet"} name="action" type="submit" value="ask_a_vet" pendingLabel="Saving…">{data.selectedAction === "ask_a_vet" ? "Saved — Consider contacting a vet" : "Consider contacting a vet"}</PendingButton>
-            <PendingButton aria-pressed={data.selectedAction === "seek_urgent_care"} className="button action-urgent" disabled={data.selectedAction === "seek_urgent_care"} name="action" type="submit" value="seek_urgent_care" pendingLabel="Saving…">{data.selectedAction === "seek_urgent_care" ? "Saved — Seek urgent care" : "Seek urgent care"}</PendingButton>
-          </form>
+          <h2>{data.canSaveAction ? (selectedActionLabel ? "Change next step" : "Next step") : data.afterFirstMonth ? "Saved next step" : "Next step"}</h2>
+          {data.canSaveAction ? (
+            <>
+              <p className="muted small">Choosing an action saves it in your plan. It does not contact a veterinarian, schedule care, or message support.</p>
+              {selectedActionLabel ? <p className="notice" role="status">Saved: {selectedActionLabel}. Choose another option only if your situation changes.</p> : null}
+              <form className="stack" action={concernActionFormAction}>
+                <input name="pet_profile_id" type="hidden" value={data.profile.id} />
+                <input name="concern_key" type="hidden" value={key} />
+                <PendingButton aria-pressed={data.selectedAction === "observe"} className="secondary action-observe" disabled={data.selectedAction === "observe"} name="action" type="submit" value="observe" pendingLabel="Saving…">{data.selectedAction === "observe" ? "Saved — Observe closely" : "Observe closely"}</PendingButton>
+                <PendingButton aria-pressed={data.selectedAction === "ask_a_vet"} className="secondary action-vet" disabled={data.selectedAction === "ask_a_vet"} name="action" type="submit" value="ask_a_vet" pendingLabel="Saving…">{data.selectedAction === "ask_a_vet" ? "Saved — Consider contacting a vet" : "Consider contacting a vet"}</PendingButton>
+                <PendingButton aria-pressed={data.selectedAction === "seek_urgent_care"} className="button action-urgent" disabled={data.selectedAction === "seek_urgent_care"} name="action" type="submit" value="seek_urgent_care" pendingLabel="Saving…">{data.selectedAction === "seek_urgent_care" ? "Saved — Seek urgent care" : "Seek urgent care"}</PendingButton>
+              </form>
+            </>
+          ) : (
+            <div className="stack">
+              <p className="muted">{data.afterFirstMonth ? "The first-month plan is read-only now." : "Select this concern in Profile to save a next step."}</p>
+              {data.afterFirstMonth && selectedActionLabel ? <p className="notice" role="status">Saved: {selectedActionLabel}.</p> : null}
+              {!data.afterFirstMonth ? <Link className="secondary" href="/profile">Select this concern in Profile</Link> : null}
+            </div>
+          )}
         </aside>
         <div className="stack">
           <section className="panel">

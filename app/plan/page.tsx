@@ -76,7 +76,7 @@ export default async function PlanPage({ searchParams }: PlanPageProps) {
                                 <p className="muted small">{task.task_definitions?.description}</p>
                                 {taskMessage ? <p className="notice task-feedback" role="status">{taskMessage}</p> : null}
                               </div>
-                              <TaskActionForm buttonClassName="secondary" nodeId={node.id} operation={isDone ? "undo" : "done"} returnTo="/plan" taskId={task.id} />
+                              {!data.afterFirstMonth ? <TaskActionForm buttonClassName="secondary" nodeId={node.id} operation={isDone ? "undo" : "done"} returnTo="/plan" taskId={task.id} /> : null}
                             </div>
                           );
                         })}
@@ -100,11 +100,11 @@ export default async function PlanPage({ searchParams }: PlanPageProps) {
 
 function PlanSummary({ data, actionNode }: { data: Awaited<ReturnType<typeof getPlanData>>; actionNode: Awaited<ReturnType<typeof getPlanData>>["nodes"][number] | undefined }) {
   if (data.afterFirstMonth && data.progress.outstanding === 0) {
-    return <section className="plan-summary panel"><span className="pill">First month complete</span><h2>All in-app tasks are complete.</h2><p className="muted">Review the timeline whenever it is useful.</p></section>;
+    return <section className="plan-summary panel"><span className="pill">First month complete</span><h2>All in-app tasks are complete.</h2><p className="muted">This timeline is read-only now. Review it whenever it is useful.</p></section>;
   }
 
   if (data.afterFirstMonth) {
-    return <section className="plan-summary panel"><span className="pill">First-month period ended</span><h2>{data.progress.outstanding} task{data.progress.outstanding === 1 ? " remains" : "s remain"}.</h2><p className="muted">Finish the remaining first-month actions at your own pace.</p>{actionNode ? <Link className="secondary" href={`/plan?node=${actionNode.id}#node-${actionNode.id}`}>Open next task</Link> : null}</section>;
+    return <section className="plan-summary panel"><span className="pill">First-month period ended</span><h2>{data.progress.outstanding} task{data.progress.outstanding === 1 ? " remains" : "s remain"}.</h2><p className="muted">The remaining first-month tasks are shown as history and are read-only.</p>{actionNode ? <Link className="secondary" href={`/plan?node=${actionNode.id}#node-${actionNode.id}`}>Review remaining history</Link> : null}</section>;
   }
 
   return <section className="plan-summary panel"><span className="pill">First month in progress</span><h2>{data.currentStage ?? "Your first-month plan"}</h2><p className="muted">{data.progress.completed} completed · {data.progress.outstanding} to do</p></section>;

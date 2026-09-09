@@ -42,7 +42,7 @@ export default async function HomePage() {
                 <span className="pill">{data.nextTaskState}</span>
                 <h3>{data.nextTask.task_definitions?.title}</h3>
                 <p className="muted">{data.nextTask.task_definitions?.description}</p>
-                {data.nextTaskState !== "done" ? (
+                {!data.afterFirstMonth && data.nextTaskState !== "done" ? (
                 <TaskActionForm buttonClassName="button" operation="done" returnTo="/home" taskId={data.nextTask.id} />
                 ) : null}
               </div>
@@ -103,7 +103,7 @@ export default async function HomePage() {
           </section>
         )}
 
-        <section className="panel home-checkin">
+        {!data.afterFirstMonth ? <section className="panel home-checkin">
             <h2>Today&apos;s check-in</h2>
             <p className="muted">How does {data.profile.name} seem today?</p>
             <form className="stack" action={submitCheckInAction}>
@@ -118,7 +118,7 @@ export default async function HomePage() {
                 Review the next safest step
               </Link>
             ) : null}
-        </section>
+        </section> : null}
 
         <section className="panel home-milestone">
           <h2>Recent Milestone</h2>

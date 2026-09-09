@@ -1,6 +1,5 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
@@ -8,11 +7,11 @@ import {
   AGE_STAGES,
   ARRIVAL_GROUP_SIZES,
   HEALTH_RECORD_STATUSES,
+  dayNumber,
+  isAfterFirstMonth,
   isConcernAction,
   isCheckInStatus,
-  dateForDay,
   sanitizeConcernKeys,
-  shouldCreateTask,
   taskMutationValues
 } from "@/lib/domain";
 import {
@@ -20,7 +19,7 @@ import {
   paidAccess,
   recordProductEvent,
   recordConcernAction,
-  staticContent,
+  reconcileMilestones,
   unlockMilestone
 } from "@/lib/app-data";
 import { siteUrl } from "@/lib/env";
@@ -33,7 +32,6 @@ import type {
   CheckInStatus,
   ConcernAction,
   HealthRecordsStatus,
-  PetProfile,
   PetType,
   TaskDefinition
 } from "@/lib/types";
@@ -42,13 +40,11 @@ export async function signInAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!email) redirect("/login?error=missing_email");
 
-  const headerStore = await headers();
-  const origin = headerStore.get("origin") ?? siteUrl();
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${origin}/auth/callback`
+      emailRedirectTo: `${siteUrl()}/auth/callback`
     }
   });
 
@@ -65,37 +61,15 @@ export async function signOutAction() {
 export async function createProfileAction(formData: FormData) {
   const user = await getUserOrRedirect();
   const supabase = await createSupabaseServerClient();
-  const admin = createSupabaseAdminClient();
   const concernKeys = sanitizeConcernKeys(formData.getAll("concerns").map(String));
-
-  const profilePayload = { user_id: user.id, ...profileFormValues(formData, String(formData.get("pet_type"))) };
-
-  const { data: profile, error: profileError } = await supabase
-    .from("pet_profiles")
-    .insert(profilePayload)
-    .select("*")
-    .single();
-
-  if (profileError) throw profileError;
-
-  if (concernKeys.length) {
-    const { error } = await supabase.from("pet_concerns").insert(
-      concernKeys.map((concernKey) => ({
-        user_id: user.id,
-        pet_profile_id: profile.id,
-        concern_key: concernKey
-      }))
-    );
-    if (error) throw error;
-  }
-
-  await syncTasks(admin, user.id, profile as PetProfile, concernKeys);
+  const profileValues = profileFormValues(formData, String(formData.get("pet_type")));
+  const profileId = await syncProfile(supabase, null, profileValues, concernKeys);
   const unlockedFirstDay = await unlockMilestone({
     userId: user.id,
-    petProfileId: profile.id,
+    petProfileId: profileId,
     milestoneId: "first_day_together"
   });
-  await recordProductEvent({ userId: user.id, petProfileId: profile.id as string, eventName: "profile_created" });
+  await recordProductEvent({ userId: user.id, petProfileId: profileId, eventName: "profile_created" });
 
   revalidatePath("/");
   redirect(unlockedFirstDay ? "/home?milestone=first_day_together" : "/home");
@@ -118,7 +92,6 @@ export async function updateProfileAction(
     const profileId = String(formData.get("profile_id"));
     const concernKeys = sanitizeConcernKeys(formData.getAll("concerns").map(String));
     const supabase = await createSupabaseServerClient();
-    const admin = createSupabaseAdminClient();
 
     const { data: existingProfile, error: existingProfileError } = await supabase
       .from("pet_profiles")
@@ -128,42 +101,12 @@ export async function updateProfileAction(
       .single();
     if (existingProfileError) throw existingProfileError;
 
-    const { error: profileError } = await supabase
-      .from("pet_profiles")
-      .update(profileFormValues(formData, existingProfile.pet_type))
-      .eq("id", profileId)
-      .eq("user_id", user.id);
-
-    if (profileError) throw profileError;
-
-    const { error: clearConcernsError } = await supabase
-      .from("pet_concerns")
-      .update({ cleared_at: new Date().toISOString() })
-      .eq("pet_profile_id", profileId)
-      .eq("user_id", user.id)
-      .is("cleared_at", null);
-    if (clearConcernsError) throw clearConcernsError;
-
-    if (concernKeys.length) {
-      const { error } = await supabase.from("pet_concerns").insert(
-        concernKeys.map((concernKey) => ({
-          user_id: user.id,
-          pet_profile_id: profileId,
-          concern_key: concernKey
-        }))
-      );
-      if (error) throw error;
-    }
-
-    const { data: updatedProfile, error: updatedProfileError } = await supabase
-      .from("pet_profiles")
-      .select("*")
-      .eq("id", profileId)
-      .eq("user_id", user.id)
-      .single();
-    if (updatedProfileError) throw updatedProfileError;
-
-    await syncTasks(admin, user.id, updatedProfile as PetProfile, concernKeys);
+    await syncProfile(
+      supabase,
+      profileId,
+      profileFormValues(formData, existingProfile.pet_type),
+      concernKeys
+    );
 
     revalidatePath("/home");
     revalidatePath("/plan");
@@ -209,6 +152,17 @@ async function updateTaskAction(operation: "done" | "undo", formData: FormData):
       .maybeSingle();
     if (taskError || !task) throw taskError ?? new Error("Task not found");
 
+    const { data: profile, error: profileError } = await supabase
+      .from("pet_profiles")
+      .select("adoption_date")
+      .eq("id", task.pet_profile_id)
+      .eq("user_id", user.id)
+      .single();
+    if (profileError) throw profileError;
+    if (isAfterFirstMonth(dayNumber(profile.adoption_date))) {
+      return { status: "error", message: "The first-month plan is now read-only." };
+    }
+
     const definition = task.task_definitions as TaskDefinition | null;
     if (returnTo === "/plan" && (!nodeId || definition?.node_id !== nodeId)) {
       return { status: "error", message: "We couldn't update this task. Please refresh and try again." };
@@ -224,16 +178,7 @@ async function updateTaskAction(operation: "done" | "undo", formData: FormData):
 
     const unlockedMilestones: string[] = [];
     if (operation === "done") {
-      if (definition?.milestone_key) {
-        const unlocked = await unlockMilestone({
-          userId: user.id,
-          petProfileId: task.pet_profile_id as string,
-          milestoneId: definition.milestone_key,
-          triggerTaskId: taskId
-        });
-        if (unlocked) unlockedMilestones.push(definition.milestone_key);
-      }
-      unlockedMilestones.push(...(await unlockDerivedMilestones(user.id, task.pet_profile_id as string, taskId, definition)));
+      unlockedMilestones.push(...(await reconcileMilestones(user.id, task.pet_profile_id as string)));
       await recordProductEvent({
         userId: user.id,
         petProfileId: task.pet_profile_id as string,
@@ -274,6 +219,7 @@ export async function submitCheckInAction(formData: FormData) {
     .eq("user_id", user.id)
     .single();
   if (profileError) throw profileError;
+  if (isAfterFirstMonth(dayNumber(profile.adoption_date))) return;
 
   const checkInDate = new Date().toISOString().slice(0, 10);
   const { error } = await supabase.from("pet_check_ins").upsert(
@@ -361,50 +307,27 @@ export async function createCheckoutSessionAction() {
   redirect(checkout.checkout_url);
 }
 
-async function syncTasks(
-  admin: ReturnType<typeof createSupabaseAdminClient>,
-  userId: string,
-  profile: PetProfile,
+async function syncProfile(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  profileId: string | null,
+  profileValues: ReturnType<typeof profileFormValues>,
   concernKeys: string[]
 ) {
-  const { taskDefinitions } = await staticContent();
-  const rows = taskDefinitions
-    .filter((task) => shouldCreateTask(task, profile, concernKeys))
-    .map((task) => ({
-      user_id: userId,
-      pet_profile_id: profile.id,
-      task_definition_id: task.id,
-      due_date: dateForDay(profile.adoption_date, task.due_day ?? 1),
-      is_active: true
-    }));
-
-  if (rows.length) {
-    const { error } = await admin
-      .from("pet_tasks")
-      .upsert(rows, { onConflict: "pet_profile_id,task_definition_id" });
-    if (error) throw error;
-  }
-
-  const { data: existingTasks, error: existingTasksError } = await admin
-    .from("pet_tasks")
-    .select("task_definition_id")
-    .eq("user_id", userId)
-    .eq("pet_profile_id", profile.id);
-  if (existingTasksError) throw existingTasksError;
-
-  const activeIds = new Set(rows.map((task) => task.task_definition_id));
-  const inactiveIds = (existingTasks ?? [])
-    .map((task) => task.task_definition_id as string)
-    .filter((taskDefinitionId) => !activeIds.has(taskDefinitionId));
-  if (!inactiveIds.length) return;
-
-  const { error: deactivateError } = await admin
-    .from("pet_tasks")
-    .update({ is_active: false })
-    .eq("user_id", userId)
-    .eq("pet_profile_id", profile.id)
-    .in("task_definition_id", inactiveIds);
-  if (deactivateError) throw deactivateError;
+  const { data, error } = await supabase.rpc("sync_pet_profile", {
+    p_profile_id: profileId,
+    p_pet_type: profileValues.pet_type,
+    p_name: profileValues.name,
+    p_adoption_date: profileValues.adoption_date,
+    p_estimated_age_stage: profileValues.estimated_age_stage,
+    p_health_records_status: profileValues.health_records_status,
+    p_adoption_source: profileValues.adoption_source,
+    p_arrival_group_size: profileValues.arrival_group_size,
+    p_has_resident_pets: profileValues.has_resident_pets,
+    p_concern_keys: concernKeys
+  });
+  if (error) throw error;
+  if (typeof data !== "string") throw new Error("Profile sync did not return a profile id");
+  return data;
 }
 
 function profileFormValues(formData: FormData, petType: string) {
@@ -440,52 +363,4 @@ function isPastOrToday(date: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const parsed = new Date(`${date}T00:00:00Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date && date <= new Date().toISOString().slice(0, 10);
-}
-
-async function unlockDerivedMilestones(
-  userId: string,
-  petProfileId: string,
-  triggerTaskId: string,
-  definition: TaskDefinition | null
-): Promise<string[]> {
-  const admin = createSupabaseAdminClient();
-  const unlockedMilestones: string[] = [];
-
-  if (definition?.node_id === "week_2" || definition?.node_id === "week_3") {
-    if (await unlockMilestone({
-      userId,
-      petProfileId,
-      milestoneId: "routine_taking_shape",
-      triggerTaskId
-    })) unlockedMilestones.push("routine_taking_shape");
-  }
-
-  if ((definition?.due_day ?? 0) >= 30 || definition?.node_id === "week_4") {
-    if (await unlockMilestone({
-      userId,
-      petProfileId,
-      milestoneId: "first_month_complete",
-      triggerTaskId
-    })) unlockedMilestones.push("first_month_complete");
-  }
-
-  const { data: firstWeekDone, error } = await admin
-    .from("pet_tasks")
-    .select("id, task_definitions!inner(due_day)")
-    .eq("pet_profile_id", petProfileId)
-    .eq("is_active", true)
-    .eq("status", "done")
-    .lte("task_definitions.due_day", 7);
-
-  if (error) throw error;
-  if ((firstWeekDone ?? []).length >= 3) {
-    if (await unlockMilestone({
-      userId,
-      petProfileId,
-      milestoneId: "settling_in_week_complete",
-      triggerTaskId
-    })) unlockedMilestones.push("settling_in_week_complete");
-  }
-
-  return unlockedMilestones;
 }

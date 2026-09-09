@@ -25,6 +25,7 @@ values
   ('set_up_quiet_space', 'day_1', 'Set up a quiet space', 'Give your pet a calm place with water, bedding, and easy exit options.', 'always', 1, false, 'safe_space_set_up'),
   ('first_meal_check', 'day_1', 'Check first meal and water', 'Notice whether your pet eats, drinks, and can access bowls comfortably.', 'always', 1, false, 'first_meal_check'),
   ('plan_vet_visit', 'day_4', 'Plan a first vet check', 'Book or confirm an appointment for a first-month health review.', 'always', 4, true, 'vet_visit_planned'),
+  ('review_records_available', 'day_5', 'Review available records', 'Look for vaccine, deworming, parasite prevention, and microchip details.', 'health_records_yes', 5, true, 'records_checked'),
   ('review_records', 'day_5', 'Review health records', 'Look for vaccine, deworming, parasite prevention, and microchip details.', 'health_records_not_sure', 5, true, 'records_checked'),
   ('review_records_missing', 'day_5', 'List missing records', 'Write down record gaps to discuss with a veterinarian or adoption source.', 'health_records_no', 5, true, 'records_checked'),
   ('cat_appetite_watch', 'day_2', 'Watch cat appetite closely', 'Cats may need quicker veterinary input when appetite is very low.', 'pet_type_cat', 2, true, null),

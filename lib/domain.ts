@@ -11,6 +11,7 @@ import type {
   PetTask,
   PetType,
   PurchaseStatus,
+  MilestoneDefinition,
   TaskDefinition
 } from "./types";
 
@@ -37,16 +38,15 @@ export const concernLabel = (key: string) =>
   CONCERNS.find(([value]) => value === key)?.[1] ?? key.replaceAll("_", " ");
 
 export function dayNumber(adoptionDate: string, now = new Date()) {
-  const adopted = new Date(`${adoptionDate}T00:00:00`);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const start = new Date(adopted.getFullYear(), adopted.getMonth(), adopted.getDate());
-  return Math.max(1, Math.floor((today.getTime() - start.getTime()) / 86_400_000) + 1);
+  const [year, month, date] = adoptionDate.split("-").map(Number);
+  const adopted = Date.UTC(year, month - 1, date);
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.max(1, Math.floor((today - adopted) / 86_400_000) + 1);
 }
 
 export function dateForDay(adoptionDate: string, day: number) {
-  const date = new Date(`${adoptionDate}T00:00:00`);
-  date.setDate(date.getDate() + day - 1);
-  return date.toISOString().slice(0, 10);
+  const [year, month, date] = adoptionDate.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, date + day - 1)).toISOString().slice(0, 10);
 }
 
 export function nodeForDay(nodes: CarePlanNode[], day: number) {
@@ -149,6 +149,10 @@ export function visibleConcernGuidance(guidance: ConcernGuidance, paid: boolean)
   return { ...guidance, priority_reason: "" };
 }
 
+export function visibleMilestoneDefinitions(definitions: MilestoneDefinition[], paid: boolean) {
+  return definitions.filter((definition) => paid || !definition.is_paid_visible);
+}
+
 export function isCheckInStatus(value: string): value is CheckInStatus {
   return CHECK_IN_STATUSES.includes(value as CheckInStatus);
 }
@@ -159,6 +163,15 @@ export function isConcernAction(value: string): value is ConcernAction {
 
 export function isAfterFirstMonth(day: number) {
   return day > 30;
+}
+
+export function canSaveConcernAction(isActiveConcern: boolean, afterFirstMonth: boolean) {
+  return isActiveConcern && !afterFirstMonth;
+}
+
+export function safeCallbackPath(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/home";
+  return value;
 }
 
 export function selectConcernGuidance(

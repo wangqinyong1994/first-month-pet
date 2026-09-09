@@ -3,6 +3,7 @@ import {
   dateForDay,
   dayNumber,
   defaultPlanNodeId,
+  canSaveConcernAction,
   isAfterFirstMonth,
   nodeForDay,
   planNodeTimeState,
@@ -12,8 +13,10 @@ import {
   taskProgress,
   publicLandingPreview,
   visibleConcernGuidance,
+  visibleMilestoneDefinitions,
   visiblePlanNode
 } from "./domain";
+import { completedMilestoneTriggers } from "./milestones";
 import { createSupabaseAdminClient, createSupabaseServerClient } from "./supabase/server";
 import type {
   CarePlanNode,
@@ -184,6 +187,23 @@ export async function userState(userId: string, profile: PetProfile) {
     if (result.error) throw result.error;
   }
 
+  let milestoneRows = (milestones.data ?? []) as PetMilestone[];
+  const newlyUnlockedMilestones = await reconcileMilestones(
+    userId,
+    profile.id,
+    (tasks.data ?? []) as PetTask[]
+  );
+  if (newlyUnlockedMilestones.length) {
+    const refreshedMilestones = await supabase
+      .from("pet_milestones")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("pet_profile_id", profile.id)
+      .order("unlocked_at", { ascending: false });
+    if (refreshedMilestones.error) throw refreshedMilestones.error;
+    milestoneRows = (refreshedMilestones.data ?? []) as PetMilestone[];
+  }
+
   const purchaseRows = (purchases.data ?? []) as {
     status: PurchaseStatus;
     creem_checkout_id: string | null;
@@ -192,7 +212,7 @@ export async function userState(userId: string, profile: PetProfile) {
   return {
     concernKeys: (concerns.data ?? []).map((row) => row.concern_key as string),
     tasks: (tasks.data ?? []) as PetTask[],
-    milestones: (milestones.data ?? []) as PetMilestone[],
+    milestones: milestoneRows,
     purchases: purchaseRows,
     todayCheckIn: checkIn.data as PetCheckIn | null,
     paid: purchaseRows.some((row) => row.status === "paid")
@@ -287,7 +307,7 @@ export async function getPlanData() {
 export async function getProfileData() {
   const user = await getUserOrRedirect();
   const profile = await requireProfile(user.id);
-  const [{ milestoneDefinitions }, state] = await Promise.all([
+  const [{ guidance, milestoneDefinitions }, state] = await Promise.all([
     staticContent(),
     userState(user.id, profile)
   ]);
@@ -296,13 +316,15 @@ export async function getProfileData() {
     user,
     profile,
     paid: state.paid,
-    concernKeys: state.concernKeys,
+    concernKeys: sortConcernKeys(state.concernKeys, guidance, profile.pet_type),
     purchases: state.purchases,
-    milestones: milestoneDefinitions.map((definition) => ({
+    milestones: visibleMilestoneDefinitions(milestoneDefinitions, state.paid)
+      .map((definition) => ({
       definition,
       unlocked:
         state.milestones.find((milestone) => milestone.milestone_id === definition.id) ?? null
-    }))
+      })),
+    showMilestoneUnlockPrompt: !state.paid && milestoneDefinitions.some((definition) => definition.is_paid_visible)
   };
 }
 
@@ -311,18 +333,24 @@ export async function getConcernDetail(concernKey: string) {
   const profile = await requireProfile(user.id);
   const [{ guidance }, state] = await Promise.all([staticContent(), userState(user.id, profile)]);
   const admin = createSupabaseAdminClient();
-  const { data: latestAction, error: latestActionError } = await admin
-    .from("concern_actions")
-    .select("action")
-    .eq("user_id", user.id)
-    .eq("pet_profile_id", profile.id)
-    .eq("concern_key", concernKey)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (latestActionError) throw latestActionError;
   const detail = selectConcernGuidance(guidance, concernKey, profile.pet_type);
   if (!detail) return null;
+  const isActiveConcern = state.concernKeys.includes(concernKey);
+  const afterFirstMonth = isAfterFirstMonth(dayNumber(profile.adoption_date));
+  let latestAction: { action: ConcernAction } | null = null;
+  if (isActiveConcern) {
+    const { data, error } = await admin
+      .from("concern_actions")
+      .select("action")
+      .eq("user_id", user.id)
+      .eq("pet_profile_id", profile.id)
+      .eq("concern_key", concernKey)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    latestAction = data as { action: ConcernAction } | null;
+  }
 
   await recordProductEvent({
     userId: user.id,
@@ -335,7 +363,10 @@ export async function getConcernDetail(concernKey: string) {
     profile,
     concernKey,
     paid: state.paid,
-    selectedAction: (latestAction?.action as ConcernAction | null) ?? null,
+    selectedAction: latestAction?.action ?? null,
+    isActiveConcern,
+    afterFirstMonth,
+    canSaveAction: canSaveConcernAction(isActiveConcern, afterFirstMonth),
     detail: visibleConcernGuidance(detail, state.paid)
   };
 }
@@ -397,6 +428,39 @@ export async function unlockMilestone(input: {
   return (data ?? []).length > 0;
 }
 
+export async function reconcileMilestones(
+  userId: string,
+  petProfileId: string,
+  tasks?: PetTask[]
+) {
+  const admin = createSupabaseAdminClient();
+  let completedTasks = tasks;
+
+  if (!completedTasks) {
+    const { data, error } = await admin
+      .from("pet_tasks")
+      .select("*, task_definitions(*)")
+      .eq("user_id", userId)
+      .eq("pet_profile_id", petProfileId)
+      .eq("is_active", true)
+      .eq("status", "done");
+    if (error) throw error;
+    completedTasks = (data ?? []) as PetTask[];
+  }
+
+  const triggers = completedMilestoneTriggers(completedTasks, userId, petProfileId);
+  const inserted = await Promise.all(
+    triggers.map((trigger) => unlockMilestone({
+      userId,
+      petProfileId,
+      milestoneId: trigger.milestoneId,
+      triggerTaskId: trigger.triggerTaskId
+    }))
+  );
+
+  return triggers.filter((_trigger, index) => inserted[index]).map((trigger) => trigger.milestoneId);
+}
+
 export async function recordConcernAction(input: {
   userId: string;
   petProfileId: string;
@@ -404,33 +468,14 @@ export async function recordConcernAction(input: {
   action: ConcernAction;
 }) {
   const supabase = await createSupabaseServerClient();
-  const { data: profile, error: profileError } = await supabase
-    .from("pet_profiles")
-    .select("id")
-    .eq("id", input.petProfileId)
-    .eq("user_id", input.userId)
-    .maybeSingle();
-  if (profileError) throw profileError;
-  if (!profile) throw new Error("Pet profile not found");
-
-  const { data, error } = await supabase
-    .from("concern_actions")
-    .insert({
-      user_id: input.userId,
-      pet_profile_id: input.petProfileId,
-      concern_key: input.concernKey,
-      action: input.action
-    })
-    .select("id")
-    .single();
-
-  if (error) throw error;
-  return unlockMilestone({
-    userId: input.userId,
-    petProfileId: input.petProfileId,
-    milestoneId: "concern_handled_thoughtfully",
-    triggerConcernActionId: data.id as string
+  const { data, error } = await supabase.rpc("record_concern_action", {
+    p_pet_profile_id: input.petProfileId,
+    p_concern_key: input.concernKey,
+    p_action: input.action
   });
+  if (error) throw error;
+  if (typeof data !== "boolean") throw new Error("Concern action did not return milestone state");
+  return data;
 }
 
 export function nodeDateLabel(adoptionDate: string, node: Pick<CarePlanNode, "day_start" | "day_end">) {
