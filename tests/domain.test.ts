@@ -8,6 +8,7 @@ import {
   defaultPlanNodeId,
   isAfterFirstMonth,
   isCheckInStatus,
+  isPastOrToday,
   planNodeTimeState,
   sanitizeConcernKeys,
   selectConcernGuidance,
@@ -22,10 +23,11 @@ import {
   visibleMilestoneDefinitions,
   visiblePlanNode
 } from "../lib/domain";
-import { shouldProcessCreemEvent, verifyCreemWebhookSignature } from "../lib/creem";
+import { creemEnvironment, shouldProcessCreemEvent, verifyCreemWebhookSignature } from "../lib/creem";
 import { createHmac } from "node:crypto";
 import { completedMilestoneTriggers, isMilestoneId, milestoneImagePath } from "../lib/milestones";
 import type { CarePlanNode, ConcernGuidance, MilestoneDefinition, PetTask } from "../lib/types";
+import { siteUrl } from "../lib/env";
 
 const paidNode: CarePlanNode = {
   id: "day_2",
@@ -95,6 +97,19 @@ test("callback destinations stay on the app origin", () => {
   assert.equal(safeCallbackPath("https://example.com/steal"), "/home");
   assert.equal(safeCallbackPath("//example.com/steal"), "/home");
   assert.equal(safeCallbackPath("/\\\\example.com"), "/home");
+});
+
+test("profile dates reject future and invalid calendar values", () => {
+  assert.equal(isPastOrToday("1994-05-15"), true);
+  assert.equal(isPastOrToday("2999-01-01"), false);
+  assert.equal(isPastOrToday("2026-02-30"), false);
+});
+
+test("production site and Creem configuration fail closed", () => {
+  assert.throws(() => creemEnvironment(undefined, "production"), /CREEM_ENVIRONMENT/);
+  assert.throws(() => siteUrl(undefined, "production"), /NEXT_PUBLIC_SITE_URL/);
+  assert.throws(() => siteUrl("http://example.com", "production"), /HTTPS/);
+  assert.equal(siteUrl("https://example.com/path", "production"), "https://example.com");
 });
 
 test("only unprocessed duplicate webhook events are retried", () => {

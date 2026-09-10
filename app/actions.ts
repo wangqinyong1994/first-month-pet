@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
@@ -9,6 +10,7 @@ import {
   HEALTH_RECORD_STATUSES,
   dayNumber,
   isAfterFirstMonth,
+  isPastOrToday,
   isConcernAction,
   isCheckInStatus,
   sanitizeConcernKeys,
@@ -58,20 +60,38 @@ export async function signOutAction() {
   redirect("/login");
 }
 
-export async function createProfileAction(formData: FormData) {
-  const user = await getUserOrRedirect();
-  const supabase = await createSupabaseServerClient();
-  const concernKeys = sanitizeConcernKeys(formData.getAll("concerns").map(String));
-  const profileValues = profileFormValues(formData, String(formData.get("pet_type")));
-  const profileId = await syncProfile(supabase, null, profileValues, concernKeys);
-  const unlockedFirstDay = await unlockMilestone({
-    userId: user.id,
-    petProfileId: profileId,
-    milestoneId: "first_day_together"
-  });
-  await recordProductEvent({ userId: user.id, petProfileId: profileId, eventName: "profile_created" });
+export type ProfileCreateState = { status: "idle" } | { status: "error"; message: string };
+export type CheckoutState = { status: "idle" } | { status: "error"; message: string };
+type PendingPurchase = {
+  id: string;
+  creem_checkout_id: string | null;
+  creem_checkout_url: string | null;
+  checkout_claimed: boolean;
+  checkout_claimed_at: string | null;
+};
 
-  revalidatePath("/");
+export async function createProfileAction(
+  _previousState: ProfileCreateState,
+  formData: FormData
+): Promise<ProfileCreateState> {
+  const user = await getUserOrRedirect();
+  let unlockedFirstDay = false;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const concernKeys = sanitizeConcernKeys(formData.getAll("concerns").map(String));
+    const profileValues = profileFormValues(formData, String(formData.get("pet_type")));
+    const profileId = await syncProfile(supabase, null, profileValues, concernKeys);
+    unlockedFirstDay = await unlockMilestone({
+      userId: user.id,
+      petProfileId: profileId,
+      milestoneId: "first_day_together"
+    });
+    await recordProductEvent({ userId: user.id, petProfileId: profileId, eventName: "profile_created" });
+
+    revalidatePath("/");
+  } catch {
+    return { status: "error", message: "We couldn't create this profile. Check the details and try again." };
+  }
   redirect(unlockedFirstDay ? "/home?milestone=first_day_together" : "/home");
 }
 
@@ -256,7 +276,10 @@ export async function concernActionFormAction(formData: FormData) {
   redirect(unlocked ? `/concerns/${concernKey}?milestone=concern_handled_thoughtfully` : `/concerns/${concernKey}`);
 }
 
-export async function createCheckoutSessionAction() {
+export async function createCheckoutSessionAction(
+  _previousState: CheckoutState,
+  _formData: FormData
+): Promise<CheckoutState> {
   const user = await getUserOrRedirect();
   const supabase = await createSupabaseServerClient();
   const admin = createSupabaseAdminClient();
@@ -273,37 +296,61 @@ export async function createCheckoutSessionAction() {
   const alreadyPaid = await paidAccess(user.id, profile.id as string);
   if (alreadyPaid) redirect("/home");
 
-  const { data: purchase, error: purchaseError } = await admin
-    .from("purchases")
-    .insert({
-      user_id: user.id,
-      pet_profile_id: profile.id,
-      status: "pending"
-    })
-    .select("id")
-    .single();
-
+  const checkoutClaimToken = randomUUID();
+  const { data: purchaseData, error: purchaseError } = await admin.rpc("acquire_pending_purchase", {
+    p_user_id: user.id,
+    p_pet_profile_id: profile.id,
+    p_claim_token: checkoutClaimToken
+  }).single();
   if (purchaseError) throw purchaseError;
+  const purchase = purchaseData as PendingPurchase | null;
+  if (!purchase) throw new Error("Could not create a pending purchase");
 
-  const checkout = await createCreemCheckout({
-    productId,
-    requestId: purchase.id as string,
-    successUrl: `${siteUrl()}/checkout/return`,
-    email: user.email,
-    metadata: {
-      user_id: user.id,
-      pet_profile_id: profile.id as string,
-      purchase_id: purchase.id as string
-    }
-  });
+  if (purchase.creem_checkout_url) redirect(purchase.creem_checkout_url);
+  if (!purchase.checkout_claimed) return { status: "error", message: "Checkout is already starting. Please try again in a moment." };
 
-  const { error: sessionError } = await admin
+  let checkout: Awaited<ReturnType<typeof createCreemCheckout>>;
+  try {
+    checkout = await createCreemCheckout({
+      productId,
+      requestId: purchase.id,
+      successUrl: `${siteUrl()}/checkout/return`,
+      email: user.email,
+      metadata: {
+        user_id: user.id,
+        pet_profile_id: profile.id,
+        purchase_id: purchase.id
+      }
+    });
+  } catch {
+    const { error } = await admin
+      .from("purchases")
+      .update({ status: "failed" })
+      .eq("id", purchase.id)
+      .eq("user_id", user.id)
+      .eq("status", "pending")
+      .eq("checkout_claim_token", checkoutClaimToken)
+      .select("id")
+      .maybeSingle();
+    if (error) throw error;
+    return { status: "error", message: "We couldn't start checkout. Please try again." };
+  }
+
+  const { data: savedPurchase, error: sessionError } = await admin
     .from("purchases")
-    .update({ creem_checkout_id: checkout.id })
-    .eq("id", purchase.id);
+    .update({
+      creem_checkout_id: checkout.id,
+      creem_checkout_url: checkout.checkout_url,
+      checkout_claimed_at: null,
+      checkout_claim_token: null
+    })
+    .eq("id", purchase.id)
+    .eq("checkout_claim_token", checkoutClaimToken)
+    .select("id")
+    .maybeSingle();
 
-  if (sessionError) throw sessionError;
-  await recordProductEvent({ userId: user.id, petProfileId: profile.id as string, eventName: "checkout_started" });
+  if (sessionError || !savedPurchase) throw sessionError ?? new Error("Could not save checkout session");
+  await recordProductEvent({ userId: user.id, petProfileId: profile.id, eventName: "checkout_started" });
   redirect(checkout.checkout_url);
 }
 
@@ -357,10 +404,4 @@ function profileFormValues(formData: FormData, petType: string) {
     arrival_group_size: arrivalGroupSize as ArrivalGroupSize,
     has_resident_pets: hasResidentPets
   };
-}
-
-function isPastOrToday(date: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
-  const parsed = new Date(`${date}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date && date <= new Date().toISOString().slice(0, 10);
 }

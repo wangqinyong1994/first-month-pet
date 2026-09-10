@@ -1,0 +1,6 @@
+{"file":".trellis/tasks/09-09-project-health-remediation/prd.md","reason":"Acceptance criteria and deployment authorization boundary"}
+{"file":".trellis/tasks/09-09-project-health-remediation/design.md","reason":"Payment state-machine, migration, configuration, and rollout contracts"}
+{"file":"spec-data-supabase-creem.md","reason":"Cross-check payment and data-access invariants"}
+{"file":"spec-user-flows.md","reason":"Cross-check auth, onboarding, and checkout user flow behavior"}
+{"file":".trellis/spec/backend/quality.md","reason":"Backend error handling, database, and pre-commit review criteria"}
+{"file":".trellis/spec/frontend/css-layout.md","reason":"Responsive touch-target verification criteria"}

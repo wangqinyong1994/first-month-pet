@@ -402,7 +402,7 @@ export async function checkoutStatus(checkoutId: string) {
     .maybeSingle();
 
   if (error) throw error;
-  return (data?.status ?? "pending") as PurchaseStatus;
+  return data ? (data.status as PurchaseStatus) : "not_found";
 }
 
 export async function unlockMilestone(input: {

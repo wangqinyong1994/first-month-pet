@@ -20,6 +20,13 @@ Use this contract when changing concern guidance metadata, public trust pages, o
 - Derived milestones are computed from the full completed active task set, not only from the task submitted in the current request, so historical partial writes self-heal.
 - Records-review task generation must cover all `health_records_status` values: `yes`, `no`, and `not_sure`.
 
+### Payment state and retry contracts
+
+- A pet may have at most one `pending` purchase. `acquire_pending_purchase` locks the pet row and returns an existing checkout URL, an active claim lease, or one newly claimed purchase; only the claimant may create the Creem session.
+- Checkout claims use a UUID token and a short lease. Provider failure marks only the matching pending claim as `failed`; a successful provider response clears the lease before redirecting.
+- `creem_events` is an idempotency ledger. `claim_creem_event` stores the event payload and order reference, rejects completed or actively leased duplicates, and permits retry after an expired processing lease. Completion and release are service-role-only RPCs.
+- Webhook transitions are monotonic: checkout completion updates only `pending` purchases, and refunds update only `paid` purchases. An already-applied equivalent state is accepted; conflicting or incomplete events remain retryable.
+
 ## 4. Validation & Error Matrix
 
 | Condition | Required behavior |

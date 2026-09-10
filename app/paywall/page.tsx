@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import { getUserOrRedirect, paidAccess, recordProductEvent, requireProfile } from "@/lib/app-data";
 import { visualImage } from "@/lib/visuals";
-import { createCheckoutSessionAction } from "../actions";
-import { PendingButton } from "../pending-button";
+import { CheckoutForm } from "../checkout-form";
 
 export default async function PaywallPage() {
   const user = await getUserOrRedirect();
@@ -35,9 +34,7 @@ export default async function PaywallPage() {
               <p>Use in-app reminders, concern context, and full Milestones.</p>
             </section>
           </div>
-          <form action={createCheckoutSessionAction}>
-            <PendingButton className="button" type="submit" pendingLabel="Starting checkout…">Unlock my 30-day plan - $9.99</PendingButton>
-          </form>
+          <CheckoutForm />
           <p className="muted small">One-time $9.99 purchase for one pet profile. Request a full refund within seven calendar days at wqy1994yeah@gmail.com; refunds return to the original payment method, are processed by Creem, and are not prorated.</p>
         </div>
 

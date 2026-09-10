@@ -24,6 +24,8 @@ export default async function CheckoutReturnPage({
             We&apos;re confirming your payment with Creem. Please refresh this page in a moment. If
             access does not update, email wqy1994yeah@gmail.com.
           </p>
+        ) : status === "not_found" ? (
+          <p>We couldn&apos;t find that checkout for this account. Start a new checkout from the plan page.</p>
         ) : (
           <p>Free preview remains active for this pet profile.</p>
         )}

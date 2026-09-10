@@ -18,7 +18,7 @@ export function MilestoneMoment() {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.delete("milestone");
     router.replace(nextParams.size ? `${pathname}?${nextParams.toString()}` : pathname, { scroll: false });
-  }, [pathname, reportedMilestone, router]);
+  }, [pathname, reportedMilestone, router, searchParams]);
 
   if (!milestoneId) return null;
 

@@ -51,6 +51,7 @@ export default async function ProfilePage() {
             <input
             className="input"
             id="adoption_date"
+            max={new Date().toISOString().slice(0, 10)}
             name="adoption_date"
             type="date"
             defaultValue={data.profile.adoption_date}

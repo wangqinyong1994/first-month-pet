@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { recordProductEvent } from "@/lib/app-data";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
-import { shouldProcessCreemEvent, verifyCreemWebhookSignature } from "@/lib/creem";
+import { verifyCreemWebhookSignature } from "@/lib/creem";
 
 type CreemEvent = {
   id: string;
@@ -16,6 +16,10 @@ type CreemEvent = {
 
 function stringValue(value: unknown) {
   return typeof value === "string" ? value : undefined;
+}
+
+function eventError(error: unknown) {
+  return error instanceof Error ? error.message : "Unknown webhook error";
 }
 
 export async function POST(request: NextRequest) {
@@ -34,20 +38,19 @@ export async function POST(request: NextRequest) {
   if (!event.id || !event.eventType) return NextResponse.json({ error: "Invalid event" }, { status: 400 });
 
   const admin = createSupabaseAdminClient();
-  const { error: insertError } = await admin.from("creem_events").insert({ id: event.id, event_type: event.eventType });
-  if (insertError?.code === "23505") {
-    const { data: existingEvent, error: existingEventError } = await admin
-      .from("creem_events")
-      .select("processed_at")
-      .eq("id", event.id)
-      .maybeSingle();
-    if (existingEventError) throw existingEventError;
-    if (!existingEvent) throw new Error("Creem event record disappeared during duplicate handling");
-    if (!shouldProcessCreemEvent(existingEvent.processed_at)) {
-      return NextResponse.json({ received: true });
-    }
-  }
-  if (insertError) throw insertError;
+  const orderReference = event.object.transaction?.order
+    ? typeof event.object.transaction.order === "string"
+      ? event.object.transaction.order
+      : event.object.transaction.order.id ?? null
+    : event.object.order?.id ?? null;
+  const { data: claimed, error: claimError } = await admin.rpc("claim_creem_event", {
+    p_event_id: event.id,
+    p_event_type: event.eventType,
+    p_order_reference: orderReference,
+    p_event_payload: event
+  });
+  if (claimError) throw claimError;
+  if (claimed !== true) return NextResponse.json({ received: true });
 
   try {
     if (event.eventType === "checkout.completed" && event.object.order?.status === "paid") {
@@ -71,6 +74,7 @@ export async function POST(request: NextRequest) {
         .eq("id", purchaseId)
         .eq("user_id", userId)
         .eq("pet_profile_id", petProfileId)
+        .eq("status", "pending")
         .select("user_id, pet_profile_id")
         .maybeSingle();
       if (error) throw error;
@@ -80,36 +84,64 @@ export async function POST(request: NextRequest) {
           petProfileId: purchase.pet_profile_id,
           eventName: "purchase_completed"
         });
+      } else {
+        const { data: completedPurchase, error: completedPurchaseError } = await admin
+          .from("purchases")
+          .select("status, creem_checkout_id, creem_order_id")
+          .eq("id", purchaseId)
+          .eq("user_id", userId)
+          .eq("pet_profile_id", petProfileId)
+          .maybeSingle();
+        if (completedPurchaseError) throw completedPurchaseError;
+        if (
+          !completedPurchase ||
+          completedPurchase.status !== "paid" ||
+          (completedPurchase.creem_checkout_id !== event.object.id && completedPurchase.creem_order_id !== event.object.order.id)
+        ) {
+          throw new Error("Checkout does not match a pending purchase");
+        }
       }
     }
 
     if (event.eventType === "refund.created") {
       const order = event.object.transaction?.order;
       const orderId = typeof order === "string" ? order : order?.id;
-      if (orderId) {
-        const { data: purchase, error } = await admin
+      if (!orderId) throw new Error("Refund order is missing");
+      const { data: purchase, error } = await admin
+        .from("purchases")
+        .update({ status: "refunded", refunded_at: new Date().toISOString() })
+        .eq("creem_order_id", orderId)
+        .eq("status", "paid")
+        .select("user_id, pet_profile_id")
+        .maybeSingle();
+      if (error) throw error;
+      if (purchase) {
+        await recordProductEvent({
+          userId: purchase.user_id,
+          petProfileId: purchase.pet_profile_id,
+          eventName: "refund_created"
+        });
+      } else {
+        const { data: refundedPurchase, error: refundedPurchaseError } = await admin
           .from("purchases")
-          .update({ status: "refunded", refunded_at: new Date().toISOString() })
+          .select("status")
           .eq("creem_order_id", orderId)
-          .select("user_id, pet_profile_id")
           .maybeSingle();
-        if (error) throw error;
-        if (purchase) {
-          await recordProductEvent({
-            userId: purchase.user_id,
-            petProfileId: purchase.pet_profile_id,
-            eventName: "refund_created"
-          });
+        if (refundedPurchaseError) throw refundedPurchaseError;
+        if (!refundedPurchase || refundedPurchase.status !== "refunded") {
+          throw new Error("Refund does not match a paid purchase");
         }
       }
     }
 
-    await admin.from("creem_events").update({ processed_at: new Date().toISOString(), processing_error: null }).eq("id", event.id);
+    const { data: completed, error: completeError } = await admin.rpc("complete_creem_event", { p_event_id: event.id });
+    if (completeError || completed !== true) throw completeError ?? new Error("Could not complete Creem event");
   } catch (error) {
-    await admin
-      .from("creem_events")
-      .update({ processing_error: error instanceof Error ? error.message : "Unknown webhook error" })
-      .eq("id", event.id);
+    const { data: released, error: releaseError } = await admin.rpc("release_creem_event", {
+      p_event_id: event.id,
+      p_error: eventError(error)
+    });
+    if (releaseError || released !== true) throw releaseError ?? new Error("Could not release Creem event");
     throw error;
   }
 

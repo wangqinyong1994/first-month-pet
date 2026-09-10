@@ -6,8 +6,13 @@ type CreemCheckout = {
   checkout_url: string;
 };
 
-function creemEnvironment() {
-  const environment = process.env.CREEM_ENVIRONMENT ?? "test";
+export function creemEnvironment(environment = process.env.CREEM_ENVIRONMENT, nodeEnvironment = process.env.NODE_ENV) {
+  if (!environment) {
+    if (nodeEnvironment === "production") {
+      throw new Error("Missing environment variable: CREEM_ENVIRONMENT");
+    }
+    return "test";
+  }
   if (environment !== "test" && environment !== "production") {
     throw new Error("CREEM_ENVIRONMENT must be test or production");
   }

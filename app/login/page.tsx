@@ -42,7 +42,7 @@ export default async function LoginPage({
             <TextField.Root id="email" name="email" type="email" required />
             <p className="muted small">We’ll email a secure sign-in link to this address.</p>
             {params.sent ? <p className="notice">Check your email for the sign-in link.</p> : null}
-            {params.error ? <p className="notice notice-error">The link could not be sent. Try again.</p> : null}
+            {params.error ? <p className="notice notice-error">{params.error === "invalid_link" ? "This sign-in link is invalid or expired. Request a new one below." : "The link could not be sent. Try again."}</p> : null}
             <Button type="submit">Create my plan</Button>
           </form>
         </Card>

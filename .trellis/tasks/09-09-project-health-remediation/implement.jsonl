@@ -1,0 +1,9 @@
+{"file":".trellis/tasks/archive/2026-09/09-09-project-health-audit/report.md","reason":"Authoritative defect evidence, severity boundaries, and production verification gaps"}
+{"file":"spec-data-supabase-creem.md","reason":"Existing Supabase, Creem, ownership, and fulfillment contracts"}
+{"file":"spec-user-flows.md","reason":"Existing login, onboarding, checkout return, and user-facing flow requirements"}
+{"file":"supabase/migrations/001_schema.sql","reason":"Current purchases and creem_events schema, RLS, and trigger baseline"}
+{"file":".trellis/spec/backend/quality.md","reason":"Error handling, database, and backend verification expectations"}
+{"file":".trellis/spec/frontend/components.md","reason":"Accessible form and server/client component conventions"}
+{"file":".trellis/spec/frontend/css-layout.md","reason":"Mobile touch-target and cross-environment CSS requirements"}
+{"file":".trellis/spec/shared/code-quality.md","reason":"Type safety and no-silent-error standards"}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Payment changes span database, server action, route, and UI"}
