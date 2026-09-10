@@ -1,0 +1,6 @@
+.codegraph
+.trellis
+.git
+.next
+node_modules
+.netlify
