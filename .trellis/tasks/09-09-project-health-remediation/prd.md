@@ -27,15 +27,15 @@ Correct the confirmed security, payment, release, and quality defects identified
 
 ## Acceptance Criteria
 
-- [ ] A malicious external `next` value cannot redirect the deployed callback off-origin; invalid/reused auth codes show an actionable login state.
-- [ ] A duplicate unprocessed Creem event can be safely retried exactly once; duplicate completed events do not repeat purchase/refund side effects.
-- [ ] Refund and checkout events cannot transition a refunded purchase back to paid, and unmatched events are not silently marked successful.
-- [ ] Repeated/concurrent checkout creation for one pet reuses or rejects the existing active checkout; provider failure does not leave a misleading pending state; unknown checkout IDs are not shown as indefinitely pending.
-- [ ] Required migration(s) are additive, forward-safe, verified locally, and then applied under the user's 2026-09-09 authorization.
-- [ ] `npm test`, `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass.
-- [ ] Login/profile primary controls meet 44px at 390px width; future onboarding dates cannot reach the global error boundary.
-- [ ] Production configuration fails clearly when required site URL/Creem mode is absent, and response headers implement the approved minimum policy without breaking Supabase or Creem flows.
-- [ ] The verified build is deployed and remotely verified under the user's 2026-09-09 authorization; unavailable credentials pause the work for user-controlled login.
+- [x] A malicious external `next` value cannot redirect the deployed callback off-origin; invalid/reused auth codes show an actionable login state.
+- [x] A duplicate unprocessed Creem event can be safely retried exactly once; duplicate completed events do not repeat purchase/refund side effects.
+- [x] Refund and checkout events cannot transition a refunded purchase back to paid, and unmatched events are not silently marked successful.
+- [x] Repeated/concurrent checkout creation for one pet reuses or rejects the existing active checkout; provider failure does not leave a misleading pending state; unknown checkout IDs are not shown as indefinitely pending.
+- [x] Required migration(s) are additive, forward-safe, verified locally, and then applied under the user's 2026-09-09 authorization.
+- [x] `npm test`, `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass.
+- [x] Login/profile primary controls meet 44px at 390px width; future onboarding dates cannot reach the global error boundary.
+- [x] Production configuration fails clearly when required site URL/Creem mode is absent, and response headers implement the approved minimum policy without breaking Supabase or Creem flows.
+- [x] The verified build is deployed and remotely verified under the user's 2026-09-09 authorization; unavailable credentials pause the work for user-controlled login.
 
 ## Out of scope
 

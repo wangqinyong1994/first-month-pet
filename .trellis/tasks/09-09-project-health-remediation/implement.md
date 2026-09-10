@@ -12,5 +12,6 @@
 6. Apply migration using the configured Supabase path, verify schema/RLS/grants and only controlled test data behavior, then deploy through the existing Netlify linkage.
    - Stop condition: if Supabase or Netlify authentication is unavailable, pause for user-controlled login; never clear existing browser sessions or bypass credentials.
 7. Verify the live deployment: callback cannot redirect externally, public/authenticated critical routes render, mobile touch targets meet 44px, and deploy revision is recorded.
+   - Completed: Netlify deploy `6aa1fff2dd8a07831fcc581c` is ready; root/login/home/plan/concern/profile/paywall/checkout-return returned 200; external callback probe stayed on `/login?error=invalid_link`; required headers were present.
 
 Risky files: `supabase/migrations/*`, `app/api/creem/webhook/route.ts`, `app/actions.ts`, `lib/app-data.ts`, `lib/env.ts`, `lib/creem.ts`, `next.config.mjs`.
